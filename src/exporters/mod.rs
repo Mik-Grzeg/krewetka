@@ -1,4 +1,5 @@
 pub mod kafka;
 mod errors;
-mod publisher;
+mod exporter;
 pub use kafka::{KafkaExporter, KafkaSettings};
+pub use exporter::Exporter;

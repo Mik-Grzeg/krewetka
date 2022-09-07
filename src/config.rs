@@ -30,8 +30,11 @@ impl ConfigCache {
     fn load_config(global_config_path: &str) -> Result<Config, ConfigErr> {
         let base_config_builder = ConfigBuilder::<DefaultState>::default();
         base_config_builder
-            .add_source(File::with_name(global_config_path).required(true))
-            .add_source(Environment::with_prefix(&DEFAULT_ENV_VAR_PREFIX))
+            .add_source(File::with_name(global_config_path).required(false))
+            .add_source(Environment::with_prefix(&DEFAULT_ENV_VAR_PREFIX)
+                    .separator("__")
+                    .list_separator(" ")
+                    )
             .build()
             .map_err(ConfigErr::Read)
     }

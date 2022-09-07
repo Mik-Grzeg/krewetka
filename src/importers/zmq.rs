@@ -27,7 +27,7 @@ impl ZMQ {
         let context = zmq::Context::new();
         let subscriber = context.socket(zmq::SUB).unwrap();
 
-        
+
         let subscriber_connection = format!("tcp://{}", settings.address);
 
         subscriber
@@ -41,8 +41,8 @@ impl ZMQ {
             .set_subscribe(zmq_queue)
             .expect("Failed setting subscription");
         info!("successfuly subscribed to zmq queue: [{}]", settings.queue_name);
-    
-        ZMQ { 
+
+        ZMQ {
             settings: settings,
             subscriber: subscriber,
         }

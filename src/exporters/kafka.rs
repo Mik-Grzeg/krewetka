@@ -9,7 +9,7 @@ use log::error;
 
 
 
-use super::publisher::{Export};
+use super::exporter::{Exporter};
 use super::errors::ExporterError;
 
 #[derive(Debug, Clone)]
@@ -19,9 +19,9 @@ pub struct KafkaSettings {
 }
 
 impl KafkaSettings {
-    pub fn builder() -> KafkaSettingsBuilder {
-        KafkaSettingsBuilder::default()
-    }
+    // pub fn builder() -> KafkaSettingsBuilder {
+    //     KafkaSettingsBuilder::default()
+    // }
 
     pub fn get_brokers_kafka_format(&self) -> String {
         self.brokers.join(",")
@@ -31,38 +31,38 @@ impl KafkaSettings {
 
 
 
-#[derive(Default)]
-pub struct KafkaSettingsBuilder {
-    brokers: Vec<String>,
-    topic: Option<String>,
-}
+// #[derive(Default)]
+// pub struct KafkaSettingsBuilder {
+//     brokers: Vec<String>,
+//     topic: Option<String>,
+// }
 
-impl KafkaSettingsBuilder {
-    pub fn new() -> KafkaSettingsBuilder {
-        KafkaSettingsBuilder {
-            brokers: Vec::new(),
-            topic: None
-        }
-    }
+// impl KafkaSettingsBuilder {
+//     pub fn new() -> KafkaSettingsBuilder {
+//         KafkaSettingsBuilder {
+//             brokers: Vec::new(),
+//             topic: None
+//         }
+//     }
 
 
-    pub fn add_address(mut self, host: String, port: u16) -> KafkaSettingsBuilder {
-        self.brokers.push(format!("{}:{}", host, port));
-        self
-    }
+//     pub fn add_address(mut self, host: String, port: u16) -> KafkaSettingsBuilder {
+//         self.brokers.push(format!("{}:{}", host, port));
+//         self
+//     }
 
-    pub fn topic(mut self, topic: String) -> KafkaSettingsBuilder {
-        self.topic = Some(topic);
-        self
-    }
+//     pub fn topic(mut self, topic: String) -> KafkaSettingsBuilder {
+//         self.topic = Some(topic);
+//         self
+//     }
 
-    pub fn build(self) -> KafkaSettings {
-        KafkaSettings {
-            brokers: self.brokers,
-            topic: self.topic.expect("missing topic"),
-        }
-    }
-}
+//     pub fn build(self) -> KafkaSettings {
+//         KafkaSettings {
+//             brokers: self.brokers,
+//             topic: self.topic.expect("missing topic"),
+//         }
+//     }
+// }
 
 
 pub struct KafkaExporter {
@@ -97,7 +97,7 @@ impl KafkaExporter {
                 .payload(&message)
                 .key("KREWETKA")
                 .headers(OwnedHeaders::new()
-                    .add::<String>( "header_key", &"header_value".to_string()) 
+                    .add::<String>( "header_key", &"header_value".to_string())
                 ),
                 Duration::from_secs(0),
             ).await.map_err(|e| e.into())
