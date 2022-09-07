@@ -1,38 +1,53 @@
-use kafka::producer::{Producer, Record};
+use std::fmt;
+use std::future::Future;
+use std::time::Duration;
+
+use rdkafka::config::ClientConfig;
+use rdkafka::message::{Headers, OwnedHeaders};
+use rdkafka::producer::{FutureProducer, FutureRecord};
 use log::error;
 
-use super::publisher::{Export, ExporterError};
+
+
+use super::publisher::{Export};
+use super::errors::ExporterError;
 
 #[derive(Debug, Clone)]
 pub struct KafkaSettings {
-    addresses: Vec<String>,
-    topic: Option<String>,
+    pub brokers: Vec<String>,
+    pub topic: String,
 }
 
 impl KafkaSettings {
     pub fn builder() -> KafkaSettingsBuilder {
         KafkaSettingsBuilder::default()
     }
+
+    pub fn get_brokers_kafka_format(&self) -> String {
+        self.brokers.join(",")
+    }
+
 }
 
 
 
 #[derive(Default)]
 pub struct KafkaSettingsBuilder {
-    addresses: Vec<String>,
+    brokers: Vec<String>,
     topic: Option<String>,
 }
 
 impl KafkaSettingsBuilder {
     pub fn new() -> KafkaSettingsBuilder {
         KafkaSettingsBuilder {
-            addresses: Vec::new(),
+            brokers: Vec::new(),
             topic: None
         }
     }
 
+
     pub fn add_address(mut self, host: String, port: u16) -> KafkaSettingsBuilder {
-        self.addresses.push(format!("{}:{}", host, port));
+        self.brokers.push(format!("{}:{}", host, port));
         self
     }
 
@@ -43,8 +58,8 @@ impl KafkaSettingsBuilder {
 
     pub fn build(self) -> KafkaSettings {
         KafkaSettings {
-            addresses: self.addresses,
-            topic: self.topic,
+            brokers: self.brokers,
+            topic: self.topic.expect("missing topic"),
         }
     }
 }
@@ -52,29 +67,47 @@ impl KafkaSettingsBuilder {
 
 pub struct KafkaExporter {
     settings: KafkaSettings,
-    client: Producer,
+    producer: FutureProducer,
+}
+
+impl fmt::Debug for KafkaExporter {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self.settings)
+    }
 }
 
 impl KafkaExporter {
-    pub fn new(settings: KafkaSettings) -> Result<KafkaExporter, kafka::Error> {
-        let client = match Producer::from_hosts(settings.addresses.clone()).create() {
-                Ok(p) => p,
-                Err(e) =>  {
-                    error!("Unable to create producer using given settings");
-                    return Err(e)
-                }
-            };
+    pub fn new(settings: KafkaSettings) -> Result<KafkaExporter, ExporterError> {
+        let producer: FutureProducer = ClientConfig::new()
+            .set("bootstrap.servers", settings.get_brokers_kafka_format())
+            .set("message.timeout.ms", "5000")
+            .create()
+            .expect("Producer creation error");
 
         Ok(KafkaExporter {
             settings: settings,
-            client: client,
+            producer: producer,
         })
+    }
+
+    pub async fn export(&self, message: Vec<u8>) -> Result<(i32, i64), ExporterError> {
+        self.producer
+            .send(
+                FutureRecord::to(&self.settings.topic)
+                .payload(&message)
+                .key("KREWETKA")
+                .headers(OwnedHeaders::new()
+                    .add::<String>( "header_key", &"header_value".to_string()) 
+                ),
+                Duration::from_secs(0),
+            ).await.map_err(|e| e.into())
     }
 }
 
-impl Export for KafkaExporter {
-    fn export(&self) -> Result<(), ExporterError> {
-        //TODO kafka exporter
-        Ok(())
-    }
-}
+// impl Export for KafkaExporter {
+//     fn
+
+//     fn settings(&self) -> String {
+//         format!("{}", self.settings())
+//     }
+// }
