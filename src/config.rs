@@ -33,7 +33,6 @@ impl ConfigCache {
             .add_source(File::with_name(global_config_path).required(false))
             .add_source(Environment::with_prefix(&DEFAULT_ENV_VAR_PREFIX)
                     .separator("__")
-                    .list_separator(" ")
                     )
             .build()
             .map_err(ConfigErr::Read)

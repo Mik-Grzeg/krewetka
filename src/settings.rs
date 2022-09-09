@@ -74,7 +74,7 @@ pub enum ExporterVariants {
 impl From<ExporterVariants> for String {
     fn from(variant: ExporterVariants) -> Self {
         match variant {
-            ExporterVariants::Kafka => "Kafka".to_string(),
+            ExporterVariants::Kafka => "kafka".to_string(),
         }
     }
 }
@@ -122,15 +122,8 @@ mod tests {
     use serde_yaml;
     use pretty_assertions::assert_eq;
     use test_case::test_case;
+    use serial_test::serial;
     use std::env;
-
-    const TWO_BROKERS:      Option<String> = Some(String::from("broker:9092,broker:9091"));
-    const ONE_BROKER:      Option<String> = Some(String::from("broker:9092"));
-    const ONE_BROKER_WITH_COMMA:      Option<String> = Some(String::from("broker:9092,"));
-    const BLANK:    Option<String> = Some(String::from(""));
-    const TOPIC:        Option<String> = Some(String::from("test"));
-    const ZMQ_ADDRESS:  Option<String> = Some(String::from("localhost:5561"));
-    const ZMQ_QUEUE:    Option<String> = Some(String::from("test"));
 
     fn parse_option_string(s: &Option<String>) -> String {
         match s {
@@ -139,11 +132,11 @@ mod tests {
         }
     }
 
-    #[test_case(ImporterVariants::ZMQ, ZMQ_ADDRESS, ZMQ_QUEUE)]
+    #[test_case(ImporterVariants::ZMQ, Some(String::from("localhost:5561")), Some(String::from("test")))]
     #[test_case(ImporterVariants::ZMQ, None, None)]
-    #[test_case(ImporterVariants::ZMQ, BLANK, BLANK)]
-    #[test_case(ImporterVariants::ZMQ, ZMQ_ADDRESS, BLANK)]
-    #[test_case(ImporterVariants::ZMQ, BLANK, ZMQ_QUEUE)]
+    #[test_case(ImporterVariants::ZMQ, Some(String::from("localhost:5561")), None)]
+    #[test_case(ImporterVariants::ZMQ, None, Some(String::from("test")))]
+    #[serial]
     fn test_importer_config_deserialization(source: ImporterVariants, address: Option<String>, queue_name: Option<String>) {
         let (exporter_yaml, exporter) = mock_exporter();
         let cfg = serde_yaml::from_str(&format!("
@@ -190,10 +183,10 @@ mod tests {
         (yaml.to_string(), obj)
     }
 
-    #[test_case(ImporterVariants::ZMQ, ZMQ_ADDRESS, ZMQ_QUEUE, ExporterVariants::Kafka, TWO_BROKERS, TOPIC)]
-    #[test_case(ImporterVariants::ZMQ, ZMQ_ADDRESS, ZMQ_QUEUE, ExporterVariants::Kafka, ONE_BROKER, TOPIC)]
-    #[test_case(ImporterVariants::ZMQ, ZMQ_ADDRESS, ZMQ_QUEUE, ExporterVariants::Kafka, ONE_BROKER_WITH_COMMA, TOPIC)]
-    #[test_case(ImporterVariants::ZMQ, ZMQ_ADDRESS, ZMQ_QUEUE, ExporterVariants::Kafka, None, TOPIC)]
+    #[test_case(ImporterVariants::ZMQ, Some(String::from("localhost:5561")), Some(String::from("test")), ExporterVariants::Kafka, Some(String::from("broker5:9092")), Some(String::from("test_topic")); "single broker")]
+    #[test_case(ImporterVariants::ZMQ, Some(String::from("localhost:5561")), Some(String::from("test")), ExporterVariants::Kafka, Some(String::from("broker1:9092,broker2:9092")), Some(String::from("test_topic")); "two brokers")]
+    #[test_case(ImporterVariants::ZMQ, Some(String::from("localhost:5561")), Some(String::from("test")), ExporterVariants::Kafka, Some(String::from("broker:9092,")), Some(String::from("test_topic")); "single broker with trailing comma")]
+    #[test_case(ImporterVariants::ZMQ, Some(String::from("localhost:5561")), Some(String::from("test")), ExporterVariants::Kafka, Some(String::from("")), Some(String::from("test_topic")); "missing broker")]
     fn test_env_configs(
         source: ImporterVariants,
         zmq_address: Option<String>,
@@ -209,16 +202,17 @@ mod tests {
 
         // expected configuration
         let configuration = Configuration {
-                importer: Importer { source, settings: importer_settings },
-                exporter: Exporter { destination, settings: exporter_settings },
+                importer: Importer { source: source.clone(), settings: importer_settings },
+                exporter: Exporter { destination: destination.clone(), settings: exporter_settings },
         };
 
-        // set env vars with the data provided in test cases
-        env::set_var("KREWETKA__IMPORTER__SETTINGS__ZMQ_ADDRESS", parse_option_string(&zmq_address));
-        env::set_var("KREWETKA__IMPORTER__SETTINGS__ZMQ_QUEUE_NAME", parse_option_string(&zmq_queue_name));
+        let env_setter = |key, val|  { env::set_var(key, parse_option_string(val)); };
 
-        env::set_var("KREWETKA__EXPORTER__SETTINGS__KAFKA_BROKERS", parse_option_string(&kafka_brokers));
-        env::set_var("KREWETKA__EXPORTER__SETTINGS__KAFKA_TOPIC", parse_option_string(&kafka_topic));
+        // set env vars with the data provided in test cases
+        env_setter("KREWETKA__IMPORTER__SETTINGS__ZMQ_ADDRESS", &zmq_address);
+        env_setter("KREWETKA__IMPORTER__SETTINGS__ZMQ_QUEUE_NAME", &zmq_queue_name);
+        env_setter("KREWETKA__EXPORTER__SETTINGS__KAFKA_BROKERS", &kafka_brokers);
+        env_setter("KREWETKA__EXPORTER__SETTINGS__KAFKA_TOPIC", &kafka_topic);
 
         env::set_var("KREWETKA__EXPORTER__DESTINATION", &String::from(destination));
         env::set_var("KREWETKA__IMPORTER__SOURCE", &String::from(source));
