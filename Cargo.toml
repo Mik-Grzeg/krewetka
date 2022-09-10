@@ -26,6 +26,6 @@ test-case = "2.2.1"
 serial_test = "0.9.0"
 criterion = "0.3.6"
 
-[[bench]]
-name = "exporter_bench"
-harness = false
+#[[bench]]
+#name = "exporter_bench"
+#harness = false

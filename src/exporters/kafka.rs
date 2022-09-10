@@ -1,19 +1,18 @@
-use std::{fmt};
-use std::future::Future;
 use rdkafka::Message;
-use tokio::sync::mpsc::Receiver;
+use std::fmt;
+use std::future::Future;
 use std::time::Duration;
+use tokio::sync::mpsc::Receiver;
+use tokio::time::Instant;
 
 use async_trait::async_trait;
+use log::{debug, error};
 use rdkafka::config::ClientConfig;
 use rdkafka::message::{Headers, OwnedHeaders};
 use rdkafka::producer::{FutureProducer, FutureRecord};
-use log::{error, debug};
 
-
-
-use super::exporter::{Export};
 use super::errors::ExporterError;
+use super::exporter::Export;
 
 #[derive(Debug, Clone)]
 pub struct KafkaSettings {
@@ -29,10 +28,7 @@ impl KafkaSettings {
     pub fn get_brokers_kafka_format(&self) -> String {
         self.brokers.join(",")
     }
-
 }
-
-
 
 // #[derive(Default)]
 // pub struct KafkaSettingsBuilder {
@@ -47,7 +43,6 @@ impl KafkaSettings {
 //             topic: None
 //         }
 //     }
-
 
 //     pub fn add_address(mut self, host: String, port: u16) -> KafkaSettingsBuilder {
 //         self.brokers.push(format!("{}:{}", host, port));
@@ -66,7 +61,6 @@ impl KafkaSettings {
 //         }
 //     }
 // }
-
 
 pub struct KafkaExporter {
     settings: KafkaSettings,
@@ -92,40 +86,38 @@ impl KafkaExporter {
             producer: producer,
         })
     }
-
-
 }
 
 #[async_trait]
 impl Export for KafkaExporter {
-    async fn export(&self, rx: &mut Receiver<Vec<u8>>) {
-
-        let mut buffer: Vec<u8>;//= Vec::with_capacity(100);
-
-        loop {
-            // buffer = rx.recv();
-            buffer = match rx.recv().await {
-                Some(m) => m,
-                None => { error!("We've been tricked and quite possibly bamboozled. No message was found on the channel"); return  }
-            };
-
-            let result = self.producer
-                .send(
-                    FutureRecord::to(&self.settings.topic)
-                    .payload(&buffer)
+    async fn export(&self, msg: &[u8]) {
+        // send event to kafka
+        let result = self
+            .producer
+            .send(
+                FutureRecord::to(&self.settings.topic)
+                    .payload(msg)
                     .key("KREWETKA")
-                    .headers(OwnedHeaders::new()
-                        .add::<String>( "header_key", &"header_value".to_string())
+                    .headers(
+                        OwnedHeaders::new()
+                            .add::<String>("header_key", &"header_value".to_string()),
                     ),
-                    Duration::from_secs(0),
-                ).await.map_err(|e| e.into());
+                Duration::from_secs(0),
+            )
+            .await
+            .map_err(|e| e.into());
 
-            match result {
-                Ok((partition, offset)) => debug!("Event saved at partition: {}\toffset: {}", partition, offset),
-                Err((kafka_err, owned_msg)) => error!("Unable to send message: {}\nPayload: {:?}", kafka_err, owned_msg.payload()),
-            };
-        }
+        // describe if it was successfull
+        match result {
+            Ok((partition, offset)) => debug!(
+                "Event saved at partition: {}\toffset: {}",
+                partition, offset
+            ),
+            Err((kafka_err, owned_msg)) => error!(
+                "Unable to send message: {}\nPayload: {:?}",
+                kafka_err,
+                owned_msg.payload()
+            ),
+        };
     }
 }
-
-

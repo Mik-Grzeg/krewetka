@@ -2,17 +2,17 @@ use core::fmt;
 
 use std::sync::Arc;
 
+use log::{debug, info};
 use zmq::{Context, Socket};
-use log::{info, debug};
 
 use async_trait::async_trait;
 
-use super::{import::Import, errors::ImporterError};
+use super::{errors::ImporterError, import::Import};
 
 #[derive(Debug)]
 pub struct ZMQSettings {
     pub address: String,
-    pub queue_name: String
+    pub queue_name: String,
 }
 
 pub struct ZMQ {
@@ -31,20 +31,25 @@ impl ZMQ {
         let context = zmq::Context::new();
         let subscriber = context.socket(zmq::SUB).unwrap();
 
-
         let subscriber_connection = format!("tcp://{}", settings.address);
 
         subscriber
             .connect(&subscriber_connection)
             .expect("Failed connecting subscriber");
-        info!("successfuly connected to socket at: [{}]", subscriber_connection);
+        info!(
+            "successfuly connected to socket at: [{}]",
+            subscriber_connection
+        );
 
         let zmq_queue = settings.queue_name.as_bytes();
 
         subscriber
             .set_subscribe(zmq_queue)
             .expect("Failed setting subscription");
-        info!("successfuly subscribed to zmq queue: [{}]", settings.queue_name);
+        info!(
+            "successfuly subscribed to zmq queue: [{}]",
+            settings.queue_name
+        );
 
         ZMQ {
             settings: settings,
@@ -59,7 +64,8 @@ unsafe impl Sync for ZMQ {}
 #[async_trait]
 impl Import for ZMQ {
     async fn import(&self) -> Result<Vec<u8>, ImporterError> {
-        let mut messages = self.subscriber
+        let mut messages = self
+            .subscriber
             .recv_multipart(0)
             .map_err(ImporterError::ZMQErr)?;
         let msg = messages.remove(1);
