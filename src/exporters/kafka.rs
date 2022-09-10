@@ -1,14 +1,14 @@
 use rdkafka::Message;
 use std::fmt;
-use std::future::Future;
+
 use std::time::Duration;
-use tokio::sync::mpsc::Receiver;
-use tokio::time::Instant;
+
+
 
 use async_trait::async_trait;
 use log::{debug, error};
 use rdkafka::config::ClientConfig;
-use rdkafka::message::{Headers, OwnedHeaders};
+use rdkafka::message::{OwnedHeaders};
 use rdkafka::producer::{FutureProducer, FutureRecord};
 
 use super::errors::ExporterError;

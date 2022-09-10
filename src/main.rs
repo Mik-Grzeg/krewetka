@@ -1,16 +1,16 @@
-use std::error;
 
-use crate::exporters::{run, Export};
+
+
 use crate::importers::import::Import;
-use ::config::Config;
-use clap::Parser;
+
+
 
 use self::config::{ConfigCache, ConfigErr};
-use log::{debug, error, info, warn};
+use log::{debug, error, info};
 
 use tokio::sync::mpsc;
-use tokio::task::{self, futures};
-use tokio::time::{sleep, Duration};
+use tokio::task::{self};
+
 
 mod config;
 mod exporters;
@@ -33,7 +33,7 @@ pub enum AppInitErr {
 }
 
 impl ApplicationState {
-    pub fn new(config_cache: ConfigCache, config: Configuration) -> Result<Self, AppInitErr> {
+    pub fn new(config_cache: ConfigCache, _config: Configuration) -> Result<Self, AppInitErr> {
         Ok(Self {
             config: config_cache,
         })

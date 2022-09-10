@@ -1,9 +1,9 @@
 use core::fmt;
 
-use super::config::ConfigCache;
+
 use crate::exporters::{KafkaExporter, KafkaSettings}; // Exporter};
 use crate::importers::{import::Import, ZMQSettings, ZMQ};
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize};
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub enum ImporterVariants {
@@ -127,6 +127,8 @@ mod tests {
     use serial_test::serial;
     use std::env;
     use test_case::test_case;
+    use crate::config::ConfigCache;
+
 
     fn parse_option_string(s: &Option<String>) -> String {
         match s {

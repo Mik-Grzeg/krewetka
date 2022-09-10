@@ -1,9 +1,9 @@
 use core::fmt;
 
-use std::sync::Arc;
+
 
 use log::{debug, info};
-use zmq::{Context, Socket};
+use zmq::{Socket};
 
 use async_trait::async_trait;
 

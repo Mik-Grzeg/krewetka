@@ -1,5 +1,5 @@
 use rdkafka::{
-    error::KafkaError, message::OwnedMessage, producer::future_producer::OwnedDeliveryResult,
+    error::KafkaError, message::OwnedMessage,
 };
 
 #[derive(Debug)]
