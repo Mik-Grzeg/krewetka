@@ -1,0 +1,25 @@
+name: Testing action
+on: [push]
+
+jobs:
+  cargo-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Lint
+        run: cargo clippy
+
+      - name: Test
+        run: cargo test
+
+      - name: Build 
+        run: cargo build
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Build docker image of agent
+        run: docker build . 
