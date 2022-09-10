@@ -1,4 +1,8 @@
 use super::errors::ImporterError;
-pub trait Import {
-    fn import(&self) -> Result<Vec<u8>, ImporterError>;
+use async_trait::async_trait;
+use std::sync::Arc;
+
+#[async_trait]
+pub trait Import: Sync + Send {
+    async fn import(&self) -> Result<Vec<u8>, ImporterError>;
 }

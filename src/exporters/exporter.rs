@@ -1,15 +1,21 @@
+use async_trait::async_trait;
+use tokio::sync::mpsc::Receiver;
+
 use super::errors::ExporterError;
 use std::fmt::Debug;
 use std::future::Future;
 
-pub trait Exporter {
-
-    fn export(&self, message: Vec<u8>) -> Box<dyn Future<Output = Result<(), ExporterError>>>;
-    fn settings(&self) -> String;
+#[async_trait]
+pub trait Export: Sync + Send {
+    async fn export(&self, message: &mut Receiver<Vec<u8>>);
 }
 
-impl Debug for dyn Exporter {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "Exporter: {{{}}}", self.settings())
-    }
-}
+// pub fn run(exporter: impl Export, rx: &mut Receiver<Vec<u8>>) {
+//     exporter.export(message)
+// }
+
+// impl Debug for dyn Exporter {
+//     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+//         write!(f, "Exporter: {{{}}}", self.settings())
+//     }
+// }

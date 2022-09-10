@@ -1,15 +1,18 @@
-use std::fmt;
+use std::{fmt};
 use std::future::Future;
+use rdkafka::Message;
+use tokio::sync::mpsc::Receiver;
 use std::time::Duration;
 
+use async_trait::async_trait;
 use rdkafka::config::ClientConfig;
 use rdkafka::message::{Headers, OwnedHeaders};
 use rdkafka::producer::{FutureProducer, FutureRecord};
-use log::error;
+use log::{error, debug};
 
 
 
-use super::exporter::{Exporter};
+use super::exporter::{Export};
 use super::errors::ExporterError;
 
 #[derive(Debug, Clone)]
@@ -90,24 +93,39 @@ impl KafkaExporter {
         })
     }
 
-    pub async fn export(&self, message: Vec<u8>) -> Result<(i32, i64), ExporterError> {
-        self.producer
-            .send(
-                FutureRecord::to(&self.settings.topic)
-                .payload(&message)
-                .key("KREWETKA")
-                .headers(OwnedHeaders::new()
-                    .add::<String>( "header_key", &"header_value".to_string())
-                ),
-                Duration::from_secs(0),
-            ).await.map_err(|e| e.into())
+
+}
+
+#[async_trait]
+impl Export for KafkaExporter {
+    async fn export(&self, rx: &mut Receiver<Vec<u8>>) {
+
+        let mut buffer: Vec<u8>;//= Vec::with_capacity(100);
+
+        loop {
+            // buffer = rx.recv();
+            buffer = match rx.recv().await {
+                Some(m) => m,
+                None => { error!("We've been tricked and quite possibly bamboozled. No message was found on the channel"); return  }
+            };
+
+            let result = self.producer
+                .send(
+                    FutureRecord::to(&self.settings.topic)
+                    .payload(&buffer)
+                    .key("KREWETKA")
+                    .headers(OwnedHeaders::new()
+                        .add::<String>( "header_key", &"header_value".to_string())
+                    ),
+                    Duration::from_secs(0),
+                ).await.map_err(|e| e.into());
+
+            match result {
+                Ok((partition, offset)) => debug!("Event saved at partition: {}\toffset: {}", partition, offset),
+                Err((kafka_err, owned_msg)) => error!("Unable to send message: {}\nPayload: {:?}", kafka_err, owned_msg.payload()),
+            };
+        }
     }
 }
 
-// impl Export for KafkaExporter {
-//     fn
 
-//     fn settings(&self) -> String {
-//         format!("{}", self.settings())
-//     }
-// }

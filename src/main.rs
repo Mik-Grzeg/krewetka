@@ -3,6 +3,7 @@ use std::error;
 use clap::Parser;
 use ::config::Config;
 use crate::importers::import::Import;
+use crate::exporters::Export;
 
 use self::config::{ConfigCache, ConfigErr};
 use log::{info, debug, warn, error};
@@ -42,46 +43,43 @@ impl ApplicationState {
     }
 
     async fn init_components(config: Configuration) -> Result<(), AppInitErr> {
-        let importer = config.importer.source.construct_importer(config.importer.settings).expect("unable to initialize importer");
         let exporter = config.exporter.destination.construct_exporter(config.exporter.settings).expect("unable to initialize exporter");
+        let importer = config.importer.source.construct_importer(config.importer.settings).expect("unable to initialize importer");
 
 
-        let (tx, mut rx) = mpsc::channel::<Vec<u8>>(5);
+        let (tx, mut rx) = mpsc::channel::<Vec<u8>>(20);
 
 
-        let (first, second) = tokio::join!(task::spawn( async move {
-            debug!("Mega tsk spawned");
-            let mut arr = vec![];
-            for n in 1..30 {
+        let first = task::spawn( async move {
+            info!("Spawned importer...");
 
-                arr.push(n);
-                tx.send(arr.clone()).await;
-                info!("Sent: {}", n);
-                sleep(Duration::from_millis(100)).await;
-            }
-
-            tx.closed();
-        }),
-        task::spawn( async move {
-            let mut buffer:Vec<Vec<u8>> = Vec::with_capacity(10);
-
+            let tx = tx.clone();
             loop {
-                let msg = match rx.recv().await {
-                    Some(m) => m,
-                    None =>  { error!("We've been tricked and quite possibly bamboozled. No message was found on the channel"); return  }
+
+                match importer.import().await {
+                    Ok(m) =>  { 
+                        if let Err(e) = tx.send(m).await {
+                            error!("unable to send fetched message to an exporter channel: {:?}", e);
+                            break;
+                        };  
+                    },
+                    Err(e) => { error!("unable to fetch message: {:?}", e); continue }
                 };
 
-                buffer.push(msg);
-                info!("Updated buffer: {:?}", buffer);
-                sleep(Duration::from_millis(1000)).await;
-                debug!("Len: {}\tCapacity: {}", buffer.len(), buffer.capacity());
-                if buffer.len() == buffer.capacity()-1 { buffer.clear() };
-
             }
+            tx.closed();
 
-        }));
+        });
+    
+        let second = task::spawn( async move {
+            info!("Spawned exporter...");
+            exporter.export(&mut rx).await;
+
+        });
 
 
+        let first = first.await.unwrap();
+        let second = second.await.unwrap();
         debug!("First: {:?}\tSecond: {:?}", first, second);
 
         Ok(())

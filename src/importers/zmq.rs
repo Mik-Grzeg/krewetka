@@ -1,7 +1,11 @@
 use core::fmt;
 
+use std::sync::Arc;
+
 use zmq::{Context, Socket};
-use log::info;
+use log::{info, debug};
+
+use async_trait::async_trait;
 
 use super::{import::Import, errors::ImporterError};
 
@@ -49,12 +53,18 @@ impl ZMQ {
     }
 }
 
+unsafe impl Send for ZMQ {}
+unsafe impl Sync for ZMQ {}
+
+#[async_trait]
 impl Import for ZMQ {
-    fn import(&self) -> Result<Vec<u8>, ImporterError> {
+    async fn import(&self) -> Result<Vec<u8>, ImporterError> {
         let mut messages = self.subscriber
             .recv_multipart(0)
             .map_err(ImporterError::ZMQErr)?;
         let msg = messages.remove(1);
+
+        debug!("Imported message: {:?}", String::from_utf8_lossy(&msg));
         Ok(msg)
     }
 }
