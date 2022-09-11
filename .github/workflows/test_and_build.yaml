@@ -7,19 +7,58 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Lint
-        run: cargo clippy
+      - name: Cargo cache
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ hashFiles('Cargo.toml') }}
+            ${{ runner.os }}-cargo
 
-      - name: Test
-        run: cargo test
+      - name: Target cache
+        uses: actions/cache@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-target-${{ hashFiles('Cargo.toml') }}
+            ${{ runner.os }}-cargo-target
 
       - name: Build 
-        run: cargo build
+        run: cargo build --verbose
 
-  docker:
+      - name: Test
+        run: cargo test --verbose
+
+      - name: Lint
+        run: cargo clippy --verbose
+
+  cross-compile:
+    needs: cargo-checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Cargo cache
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo
+          key: ${{ runner.os }}-cross-${{ hashFiles('Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cross-${{ hashFiles('Cargo.toml') }}
+            ${{ runner.os }}-cross
 
-      - name: Build docker image of agent
-        run: docker build . 
+      - name: Target cache
+        uses: actions/cache@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-cross-target-${{ hashFiles('Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cross-target-${{ hashFiles('Cargo.toml') }}
+            ${{ runner.os }}-cross-target
+
+      - name: Install cross
+        run: wget -c https://github.com/cross-rs/cross/releases/download/v0.2.4/cross-x86_64-unknown-linux-musl.tar.gz -O - | tar -xz
+
+      - name: Compile for arm
+        run: ./cross build --target armv7-unknown-linux-gnueabihf --verbose 
