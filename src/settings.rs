@@ -2,7 +2,7 @@ use core::fmt;
 
 
 use crate::exporters::{KafkaExporter, KafkaSettings}; // Exporter};
-use crate::importers::{import::Import, ZMQSettings, ZMQ};
+use crate::importers::{Import, ZMQSettings, ZMQ};
 use serde::{Deserialize};
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
