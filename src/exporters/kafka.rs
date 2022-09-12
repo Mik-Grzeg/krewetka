@@ -1,4 +1,5 @@
 use rdkafka::Message;
+use rdkafka::error::KafkaError;
 use std::fmt;
 
 use std::time::Duration;
@@ -21,46 +22,10 @@ pub struct KafkaSettings {
 }
 
 impl KafkaSettings {
-    // pub fn builder() -> KafkaSettingsBuilder {
-    //     KafkaSettingsBuilder::default()
-    // }
-
     pub fn get_brokers_kafka_format(&self) -> String {
         self.brokers.join(",")
     }
 }
-
-// #[derive(Default)]
-// pub struct KafkaSettingsBuilder {
-//     brokers: Vec<String>,
-//     topic: Option<String>,
-// }
-
-// impl KafkaSettingsBuilder {
-//     pub fn new() -> KafkaSettingsBuilder {
-//         KafkaSettingsBuilder {
-//             brokers: Vec::new(),
-//             topic: None
-//         }
-//     }
-
-//     pub fn add_address(mut self, host: String, port: u16) -> KafkaSettingsBuilder {
-//         self.brokers.push(format!("{}:{}", host, port));
-//         self
-//     }
-
-//     pub fn topic(mut self, topic: String) -> KafkaSettingsBuilder {
-//         self.topic = Some(topic);
-//         self
-//     }
-
-//     pub fn build(self) -> KafkaSettings {
-//         KafkaSettings {
-//             brokers: self.brokers,
-//             topic: self.topic.expect("missing topic"),
-//         }
-//     }
-// }
 
 pub struct KafkaExporter {
     settings: KafkaSettings,
@@ -90,7 +55,7 @@ impl KafkaExporter {
 
 #[async_trait]
 impl Export for KafkaExporter {
-    async fn export(&self, msg: &[u8]) {
+    async fn export(&self, msg: &[u8]) -> Result<(), ExporterError>{
         // send event to kafka
         let result = self
             .producer
@@ -109,15 +74,21 @@ impl Export for KafkaExporter {
 
         // describe if it was successfull
         match result {
-            Ok((partition, offset)) => debug!(
-                "Event saved at partition: {}\toffset: {}",
-                partition, offset
-            ),
-            Err((kafka_err, owned_msg)) => error!(
-                "Unable to send message: {}\nPayload: {:?}",
-                kafka_err,
-                owned_msg.payload()
-            ),
-        };
+            Ok((partition, offset)) => {
+                debug!(
+                    "Event saved at partition: {}\toffset: {}",
+                    partition, offset
+                );
+                Ok(())
+                },
+            Err((kafka_err, owned_msg)) => {
+                error!(
+                    "Unable to send message: {}\nPayload: {:?}",
+                    kafka_err,
+                    owned_msg.payload()
+                );
+                Err(ExporterError::from((kafka_err, owned_msg)))
+            }
+        }
     }
 }
