@@ -78,7 +78,7 @@ unsafe impl Sync for ZMQ {}
 #[async_trait]
 impl Import for ZMQ {
     async fn import(&self) -> Result<Vec<u8>, ImporterError> {
-        let msg = self.subscriber
+        let msg = (*self.subscriber)
             .recv()?;
 
         debug!("Imported message: {:?}", String::from_utf8_lossy(&msg));

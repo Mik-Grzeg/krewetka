@@ -1,3 +1,4 @@
+use crate::exporters::Export;
 use crate::importers::Import;
 
 use self::config::{ConfigCache, ConfigErr};
@@ -5,6 +6,7 @@ use log::{debug, error, info};
 
 use tokio::sync::mpsc;
 use tokio::task::{self};
+use tokio::time::{sleep, Duration};
 use std::sync::Arc;
 
 mod config;
@@ -55,18 +57,28 @@ impl ApplicationState {
         // make a shared channel for common data
         let (tx, mut rx) = mpsc::channel::<Vec<u8>>(20);
 
+        let tx1 = tx.clone();
 
         // spawning task responsbile for importing data
         let importer_task = task::spawn( async move {
-             importers::run(importer, tx).await
+             importers::run(importer, tx1).await
         });
         
-
-        // spawning task responsible for exporting data
-        let exporter_task = task::spawn( async move {
-            exporters::run(exporter, &mut rx).await
+        // watch buffer state
+        let watcher_task = task::spawn( async move {
+            while !tx.is_closed() {
+                sleep(Duration::from_secs(5)).await;
+                info!("current capacity of buffer: {}", tx.capacity());
+            }
         });
 
+        // export data
+        let exporter = exporters::run(exporter, &mut rx).await;
+
+
+        importer_task.await;
+        watcher_task.await;
+        // exporter.await;
         Ok(())
     }
 }
