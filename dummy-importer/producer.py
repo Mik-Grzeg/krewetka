@@ -1,6 +1,8 @@
 import time
 import zmq
 import os
+import random
+
 
 def producer():
 
@@ -18,7 +20,7 @@ def producer():
         work_message = [b"test", bytes(f'test num: {num}', encoding='utf-8')]
         zmq_socket.send_multipart(work_message)
         print(f"Sent message: {work_message}")
-        time.sleep(1)
+        time.sleep(random.uniform(0,1))
         num += 1
 
 if __name__ == '__main__':

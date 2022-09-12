@@ -1,0 +1,11 @@
+apiVersion: v2
+name: krewetka
+version: 0.0.1
+appVersion: 0.0.1
+description: Installs kafka, zookeeper
+type: application
+
+dependencies:
+  - name: kafka
+    repository: https://charts.bitnami.com/bitnami
+    version: 18.3.1
