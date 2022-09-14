@@ -1,21 +1,16 @@
-use crate::exporters::Export;
-use crate::importers::Import;
-
-use self::config::{ConfigCache, ConfigErr};
+use std::fmt;
 use log::{debug, error, info};
+
 
 use tokio::sync::mpsc;
 use tokio::task::{self};
 use tokio::time::{sleep, Duration};
-use std::sync::Arc;
 
-mod config;
-mod exporters;
-mod importers;
-mod settings;
-pub use importers::ZMQ;
+use crate::config::{ConfigCache, ConfigErr};
+use crate::importers;
+use crate::exporters;
+use crate::settings::Configuration;
 
-use settings::Configuration;
 
 const CONFIG_PATH: &str = "./krewetka.yaml";
 
@@ -27,6 +22,46 @@ pub struct ApplicationState {
 pub enum AppInitErr {
     Config(ConfigErr),
     ImporterInit(ConfigErr),
+}
+
+#[derive(Debug)]
+pub struct HostIdentifier {
+    hostname: String,
+    os_release: String,
+}
+
+impl Default for HostIdentifier {
+    fn default() -> Self {
+        let os_release = match sys_info::os_release()  {
+            Ok(r) => r,
+            Err(e) => {
+                error!("Unable to acquire information about os release. Setting it to unknown");
+                String::from("unknown")
+            }
+        };
+
+        let hostname = match sys_info::hostname() {
+            Ok(h) => h,
+            Err(e) => {
+                error!("unable to acquire information about hostname. Settings it to unknown");
+                String::from("unknown")
+            }
+        };
+
+        HostIdentifier { hostname, os_release }
+    }
+}
+
+impl From<&HostIdentifier> for String {
+    fn from(identifier: &HostIdentifier) -> String {
+        format!("{}", identifier)
+    }
+}
+
+impl fmt::Display for HostIdentifier {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}-{}", self.hostname, self.os_release)
+    }
 }
 
 impl ApplicationState {
@@ -41,6 +76,8 @@ impl ApplicationState {
     }
 
     pub async fn init_components(config: Configuration) -> Result<(), AppInitErr> {
+        let identifier = HostIdentifier::default();
+
         // initialize exporter and importer
         let exporter = config
             .exporter
@@ -63,7 +100,7 @@ impl ApplicationState {
         let importer_task = task::spawn( async move {
              importers::run(importer, tx1).await
         });
-        
+
         // watch buffer state
         let watcher_task = task::spawn( async move {
             while !tx.is_closed() {
@@ -73,7 +110,7 @@ impl ApplicationState {
         });
 
         // export data
-        let exporter = exporters::run(exporter, &mut rx).await;
+        let exporter = exporters::run(exporter, &mut rx, &identifier).await;
 
 
         importer_task.await;

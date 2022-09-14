@@ -1,6 +1,7 @@
 use rdkafka::Message;
 use rdkafka::error::KafkaError;
 use std::fmt;
+use crate::application_state::HostIdentifier;
 
 use std::time::Duration;
 
@@ -55,7 +56,7 @@ impl KafkaExporter {
 
 #[async_trait]
 impl Export for KafkaExporter {
-    async fn export(&self, msg: &[u8]) -> Result<(), ExporterError>{
+    async fn export(&self, msg: &[u8], identifier: &str) -> Result<(), ExporterError>{
         // send event to kafka
         let result = self
             .producer
@@ -65,7 +66,7 @@ impl Export for KafkaExporter {
                     .key("KREWETKA")
                     .headers(
                         OwnedHeaders::new()
-                            .add::<String>("header_key", &"header_value".to_string()),
+                            .add::<str>("host-identifier", identifier),
                     ),
                 Duration::from_secs(0),
             )

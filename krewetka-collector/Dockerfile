@@ -55,11 +55,11 @@ COPY --from=builder /etc/group /etc/group
 WORKDIR /app
 
 # Copy our build
-COPY --from=builder /app/target/release/rasp-processor ./
+COPY --from=builder /app/target/release/krewetka-collector ./
 
 #COPY ./krewetka.yaml /krewetka/krewetka.yaml
 
 # Use an unprivileged user.
 USER krewetka:krewetka
 
-CMD ["/app/rasp-processor"]
+CMD ["/app/krewetka-collector"]

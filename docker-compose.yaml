@@ -25,17 +25,26 @@ services:
     build: ./dummy-importer
 
 
-  krewetka:
-    build: .
+  krewetka-collector:
+    build: ./krewetka-collector
     depends_on:
       - broker
       - importer
     environment:
       KREWETKA__IMPORTER__SOURCE: "zmq"
       KREWETKA__IMPORTER__SETTINGS__ZMQ_ADDRESS: "importer:5561"
-      KREWETKA__IMPORTER__SETTINGS__ZMQ_QUEUE_NAME: "test"
+      KREWETKA__IMPORTER__SETTINGS__ZMQ_QUEUE_NAME: "flow"
       KREWETKA__EXPORTER__DESTINATION: "kafka"
       KREWETKA__EXPORTER__SETTINGS__KAFKA_BROKERS: "broker:9092"
-      KREWETKA__EXPORTER__SETTINGS__KAFKA_TOPIC: "test"
+      KREWETKA__EXPORTER__SETTINGS__KAFKA_TOPIC: "flows"
       RUST_LOG: "debug"
 
+  krewetka-processor:
+    build: ./krewetka-processor
+    depends_on:
+      - broker
+      - importer
+    environment:
+      KREWETKA__KAFKA_BROKERS: "broker:9092"
+      KREWETKA__KAFKA_TOPIC: "flows"
+      RUST_LOG: "debug"
