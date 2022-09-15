@@ -2,17 +2,19 @@ use async_trait::async_trait;
 use tokio::sync::mpsc::Receiver;
 use log::{error, info, debug};
 use super::errors::ExporterError;
+use crate::application_state::HostIdentifier;
 
 #[async_trait]
 pub trait Export: Sync + Send {
-    async fn export(&self, message: &[u8]) -> Result<(), ExporterError>;
+    async fn export(&self, message: &[u8], identifier: &str) -> Result<(), ExporterError>;
 }
 
-pub async fn run(exporter: impl Export, rx: &mut Receiver<Vec<u8>>) {
+pub async fn run(exporter: impl Export, rx: &mut Receiver<Vec<u8>>, identifier: &HostIdentifier) {
     info!("Spawned exporter...");
+    let identifier = &String::from(identifier);
 
     while let Some(m) = rx.recv().await  {
-        if let Err(_) = exporter.export(&m).await {
+        if let Err(_) = exporter.export(&m, identifier).await {
             debug!("Exporter is losing messages...");
         }
     };
@@ -37,7 +39,7 @@ mod tests {
 
         #[async_trait]
         impl Export for Exporter {
-            async fn export(&self, message: &[u8]) -> Result<(), ExporterError>;
+            async fn export(&self, message: &[u8], identifier: &str) -> Result<(), ExporterError>;
         } 
     }
 

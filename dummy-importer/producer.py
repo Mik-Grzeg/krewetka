@@ -1,3 +1,4 @@
+import json
 import time
 import zmq
 import os
@@ -14,14 +15,26 @@ def producer():
     zmq_socket = context.socket(zmq.PUB)
     zmq_socket.bind(ZMQ_PRODUCER_ADDRESS)
 
-    num = 0
+
     while True:
-        print(f"n = {num}")
-        work_message = [b"test", bytes(f'test num: {num}', encoding='utf-8')]
+        msg = dict(
+            OUT_BYTES = random.randint(30, 1000),
+            OUT_PKTS = random.randint(0, 10),
+            L4_DST_PORT = random.randint(1, 33333),
+            IPV4_DST_ADDR = ".".join(map(str, (random.randint(0, 255) for _ in range(4)))),
+            IPV4_SRC_ADDR = ".".join(map(str, (random.randint(0, 255) for _ in range(4)))),
+            PROTOCOL =  random.randint(0, 20),
+            IN_BYTES = random.randint(50, 500),
+            IN_PKTS = random.randint(0, 10),
+            L7_PROTO = "Unknown",
+            TCP_FLAGS = random.randint(0, 20),
+            FLOW_DURATION_MILLISECONDS = random.randint(0, 100000)
+        )
+
+        print(f"{msg}")
+        work_message = [b"flows", bytes(f'flow {json.dumps(msg)}', encoding='utf-8')]
         zmq_socket.send_multipart(work_message)
         print(f"Sent message: {work_message}")
-        time.sleep(random.uniform(0,1))
-        num += 1
-
+        time.sleep(random.uniform(0,2))
 if __name__ == '__main__':
     producer()
