@@ -28,9 +28,6 @@ jobs:
             ${{ runner.os }}-cargo-target-${{ hashFiles('Cargo.toml') }}
             ${{ runner.os }}-cargo-target
 
-      - name: Build 
-        run: cargo build --verbose
-
       - name: Test
         run: cargo test --verbose
 
@@ -61,7 +58,7 @@ jobs:
             ${{ runner.os }}-cross-target
 
       - name: Install cross
-        run: wget -c https://github.com/cross-rs/cross/releases/download/v0.2.4/cross-x86_64-unknown-linux-musl.tar.gz -O - | tar -xz
+        run: wget -c https://github.com/cross-rs/cross/releases/download/v0.2.4/cross-x86_64-unknown-linux-gnu.tar.gz -O - | tar -xz
 
       - name: Compile for arm
         run: ./cross build --target armv7-unknown-linux-gnueabihf --verbose 
