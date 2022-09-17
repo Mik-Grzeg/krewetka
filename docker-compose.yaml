@@ -26,7 +26,9 @@ services:
 
 
   krewetka-collector:
-    build: ./krewetka-collector
+    build: 
+      context: .
+      target: collector 
     depends_on:
       - broker
       - importer
@@ -37,14 +39,14 @@ services:
       KREWETKA__EXPORTER__DESTINATION: "kafka"
       KREWETKA__EXPORTER__SETTINGS__KAFKA_BROKERS: "broker:9092"
       KREWETKA__EXPORTER__SETTINGS__KAFKA_TOPIC: "flows"
-      RUST_LOG: "debug"
 
   krewetka-processor:
-    build: ./krewetka-processor
+    build: 
+      context: .
+      target: processor
     depends_on:
       - broker
       - importer
     environment:
       KREWETKA__KAFKA_BROKERS: "broker:9092"
       KREWETKA__KAFKA_TOPIC: "flows"
-      RUST_LOG: "debug"

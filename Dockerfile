@@ -1,4 +1,4 @@
-FROM lukemathwalker/cargo-chef:latest-rust-1.60.0 AS chef
+FROM lukemathwalker/cargo-chef:latest-rust-1.63.0 AS chef
 WORKDIR /app
 
 FROM chef as planner
@@ -35,16 +35,13 @@ RUN cargo chef cook --release --recipe-path recipe.json
 # Build the application
 COPY . .
 
-
 # We no longer need to use the x86_64-unknown-linux-musl target
-RUN cargo build --release
+RUN cargo build
 
 ####################################################################################################
-## Final image
+## Final image collector
 ####################################################################################################
-FROM debian:bookworm-slim
-
-
+FROM debian:bookworm-slim as collector
 
 # Import from builder.
 COPY --from=builder /etc/passwd /etc/passwd
@@ -53,11 +50,31 @@ COPY --from=builder /etc/group /etc/group
 WORKDIR /app
 
 # Copy our build
-COPY --from=builder /app/target/release/krewetka-collector ./
-
-#COPY ./krewetka.yaml /krewetka/krewetka.yaml
+COPY --from=builder /app/target/debug/krewetka-collector ./collector
 
 # Use an unprivileged user.
 USER krewetka:krewetka
 
-CMD ["/app/krewetka-collector"]
+ENV RUST_LOG="debug"
+CMD [ "/app/collector" ]
+
+
+####################################################################################################
+## Final image processor 
+####################################################################################################
+FROM debian:bookworm-slim as processor 
+
+# Import from builder.
+COPY --from=builder /etc/passwd /etc/passwd
+COPY --from=builder /etc/group /etc/group
+
+WORKDIR /app
+
+# Copy our build
+COPY --from=builder /app/target/debug/krewetka-processor ./processor
+
+# Use an unprivileged user.
+USER krewetka:krewetka
+
+ENV RUST_LOG="debug"
+CMD [ "/app/processor" ]
