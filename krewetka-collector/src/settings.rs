@@ -10,9 +10,6 @@ pub enum ImporterVariants {
     ZMQ,
 }
 
-// impl AsRef<OsStr> for ImporterVariants {
-
-// }
 
 #[derive(Debug)]
 pub enum ConstructorErr {

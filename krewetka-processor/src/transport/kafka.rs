@@ -3,8 +3,14 @@ use std::sync::mpsc::Sender;
 use super::Transport;
 
 use async_trait::async_trait;
-use log::{info, warn, error};
-use rdkafka::{consumer::{BaseConsumer, Consumer, StreamConsumer, ConsumerContext, Rebalance, CommitMode}, ClientConfig, config::RDKafkaLogLevel, ClientContext, error::KafkaResult, TopicPartitionList, Message, message::Headers};
+use log::{error, info, warn};
+use rdkafka::{
+    config::RDKafkaLogLevel,
+    consumer::{BaseConsumer, CommitMode, Consumer, ConsumerContext, Rebalance, StreamConsumer},
+    error::KafkaResult,
+    message::Headers,
+    ClientConfig, ClientContext, Message, TopicPartitionList,
+};
 use tokio::sync::mpsc;
 
 #[derive(Debug, Clone)]
@@ -34,7 +40,7 @@ impl ConsumerContext for CustomContext {
 pub struct KafkaState {
     consumer: StreamConsumer<CustomContext>,
     topic: String,
-    brokers: String // comma separated brokers
+    brokers: String, // comma separated brokers
 }
 
 impl KafkaState {
@@ -70,7 +76,7 @@ impl Transport for KafkaState {
                 Ok(msg) => msg,
                 Err(e) => {
                     error!("Unable to consume kafka stream: {}", e);
-                    break; 
+                    break;
                 }
             };
 
@@ -79,12 +85,14 @@ impl Transport for KafkaState {
                 None => continue,
                 Some(Err(e)) => {
                     warn!("Error while deserializing message payload: {:?}", e);
-                    continue
+                    continue;
                 }
             };
 
-            self.consumer.commit_message(&msg, CommitMode::Async).unwrap();
-            tx.send(payload.to_owned()).await;  // TODO handle error
+            self.consumer
+                .commit_message(&msg, CommitMode::Async)
+                .unwrap();
+            tx.send(payload.to_owned()).await; // TODO handle error
         }
     }
 }

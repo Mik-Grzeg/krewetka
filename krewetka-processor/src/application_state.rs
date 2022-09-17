@@ -1,11 +1,11 @@
+use crate::settings::Settings;
+use crate::transport::{kafka, Transport};
 use config::builder::DefaultState;
-use config::{Config, Environment, ConfigBuilder};
+use config::{Config, ConfigBuilder, Environment};
 use log::{debug, warn};
 use serde::Deserialize;
 use tokio::sync::mpsc;
 use tokio::task;
-use crate::transport::{Transport, kafka};
-use crate::settings::Settings;
 
 const DEFAULT_ENV_VAR_PREFIX: &str = "KREWETKA";
 
@@ -15,7 +15,7 @@ pub enum ConfigErr {
 }
 
 pub struct ApplicationState {
-    config: Config
+    config: Config,
 }
 
 impl ApplicationState {
@@ -34,13 +34,13 @@ impl ApplicationState {
             .build()
             .map_err(ConfigErr::Read)?;
 
-        Ok(ApplicationState {
-            config
-        })
+        Ok(ApplicationState { config })
     }
 
     pub async fn init(&self) {
-        let config = self.get_config::<Settings>().expect("Getting config failed");
+        let config = self
+            .get_config::<Settings>()
+            .expect("Getting config failed");
 
         let topic = config.kafka_topic.unwrap();
         let brokers = config.kafka_brokers.unwrap();

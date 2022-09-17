@@ -1,6 +1,10 @@
 use lib::application_state::ApplicationState;
 use log::info;
 
+pub mod flow {
+    tonic::include_proto!("flow");
+}
+
 #[tokio::main]
 async fn main() {
     // Setup logger
@@ -10,8 +14,8 @@ async fn main() {
     info!("Starting application");
     let state = match ApplicationState::new() {
         Ok(s) => s,
-        Err(e) => panic!("ApplicationState init error"),
+        Err(e) => panic!("ApplicationState init error: {:?}",  e),
     };
 
-    state.init().await
+    state.init().await;
 }
