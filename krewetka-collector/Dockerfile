@@ -24,7 +24,7 @@ RUN adduser \
     --uid "${UID}" \
     "${USER}"
 
-RUN apt-get update && apt-get install -y libzmq3-dev cmake
+RUN apt-get update && apt-get install -y libzmq3-dev cmake protobuf-compiler libprotobuf-dev
 
 WORKDIR /app
 COPY --from=planner /app/recipe.json recipe.json
@@ -35,8 +35,6 @@ RUN cargo chef cook --release --recipe-path recipe.json
 # Build the application
 COPY . .
 
-
-COPY ./ .
 
 # We no longer need to use the x86_64-unknown-linux-musl target
 RUN cargo build --release

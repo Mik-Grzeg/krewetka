@@ -1,4 +1,4 @@
-use lib::application_state::{ApplicationState, init_config};
+use lib::application_state::{init_config, ApplicationState};
 
 #[tokio::main]
 async fn main() {

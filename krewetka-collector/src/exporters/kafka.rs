@@ -1,16 +1,14 @@
-use rdkafka::Message;
-use rdkafka::error::KafkaError;
-use std::fmt;
 use crate::application_state::HostIdentifier;
+use rdkafka::error::KafkaError;
+use rdkafka::Message;
+use std::fmt;
 
 use std::time::Duration;
-
-
 
 use async_trait::async_trait;
 use log::{debug, error};
 use rdkafka::config::ClientConfig;
-use rdkafka::message::{OwnedHeaders};
+use rdkafka::message::OwnedHeaders;
 use rdkafka::producer::{FutureProducer, FutureRecord};
 
 use super::errors::ExporterError;
@@ -56,7 +54,7 @@ impl KafkaExporter {
 
 #[async_trait]
 impl Export for KafkaExporter {
-    async fn export(&self, msg: &[u8], identifier: &str) -> Result<(), ExporterError>{
+    async fn export(&self, msg: &[u8], identifier: &str) -> Result<(), ExporterError> {
         // send event to kafka
         let result = self
             .producer
@@ -64,10 +62,7 @@ impl Export for KafkaExporter {
                 FutureRecord::to(&self.settings.topic)
                     .payload(msg)
                     .key("KREWETKA")
-                    .headers(
-                        OwnedHeaders::new()
-                            .add::<str>("host-identifier", identifier),
-                    ),
+                    .headers(OwnedHeaders::new().add::<str>("host-identifier", identifier)),
                 Duration::from_secs(0),
             )
             .await
@@ -81,7 +76,7 @@ impl Export for KafkaExporter {
                     partition, offset
                 );
                 Ok(())
-                },
+            }
             Err((kafka_err, owned_msg)) => {
                 error!(
                     "Unable to send message: {}\nPayload: {:?}",

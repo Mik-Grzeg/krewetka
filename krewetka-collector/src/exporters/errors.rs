@@ -1,6 +1,4 @@
-use rdkafka::{
-    error::KafkaError, message::OwnedMessage,
-};
+use rdkafka::{error::KafkaError, message::OwnedMessage};
 
 #[derive(Debug)]
 pub enum ExporterError {

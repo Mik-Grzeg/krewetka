@@ -1,7 +1,7 @@
 use config::builder::DefaultState;
 use config::{Config, ConfigBuilder, Environment, File};
 use serde::Deserialize;
-use std::time::{SystemTime};
+use std::time::SystemTime;
 
 const DEFAULT_ENV_VAR_PREFIX: &str = "KREWETKA";
 

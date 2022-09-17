@@ -1,8 +1,8 @@
-use async_trait::async_trait;
-use tokio::sync::mpsc::Receiver;
-use log::{error, info, debug};
 use super::errors::ExporterError;
 use crate::application_state::HostIdentifier;
+use async_trait::async_trait;
+use log::{debug, error, info};
+use tokio::sync::mpsc::Receiver;
 
 #[async_trait]
 pub trait Export: Sync + Send {
@@ -13,34 +13,33 @@ pub async fn run(exporter: impl Export, rx: &mut Receiver<Vec<u8>>, identifier: 
     info!("Spawned exporter...");
     let identifier = &String::from(identifier);
 
-    while let Some(m) = rx.recv().await  {
+    while let Some(m) = rx.recv().await {
         if let Err(_) = exporter.export(&m, identifier).await {
             debug!("Exporter is losing messages...");
         }
-    };
+    }
 
     info!("Closing exporter...");
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rdkafka::message::{OwnedMessage, ToBytes};
-    use tokio_test::block_on;
-    use pretty_assertions;
     use mockall::mock;
+    use pretty_assertions;
     use rdkafka::error::KafkaError;
+    use rdkafka::message::{OwnedMessage, ToBytes};
     use tokio::sync::mpsc::channel;
     use tokio::task;
-    
-    mock!{
+    use tokio_test::block_on;
+
+    mock! {
         pub Exporter {}
 
         #[async_trait]
         impl Export for Exporter {
             async fn export(&self, message: &[u8], identifier: &str) -> Result<(), ExporterError>;
-        } 
+        }
     }
 
     // #[test]
@@ -59,7 +58,6 @@ mod tests {
     //             None
     //         )))));
 
-
     //     let (tx, mut rx) = channel::<Vec<u8>>(10);
     //     task::spawn(async move {
     //         let event = "num: {}";
@@ -70,7 +68,7 @@ mod tests {
     //                 Ok(_) => debug!("num: {} .. OK", i),
     //                 Err(e) => error!("num: {} .. {}", i, e),
     //             };
-    //         } 
+    //         }
     //     });
 
     //     block_on(run(exporter, &mut rx))

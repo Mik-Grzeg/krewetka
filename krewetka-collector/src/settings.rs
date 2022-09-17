@@ -1,9 +1,8 @@
 use core::fmt;
 
-
 use crate::exporters::{KafkaExporter, KafkaSettings}; // Exporter};
 use crate::importers::{Import, ZMQSettings, ZMQ};
-use serde::{Deserialize};
+use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub enum ImporterVariants {
@@ -122,13 +121,12 @@ pub struct Configuration {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::ConfigCache;
     use pretty_assertions::assert_eq;
     use serde_yaml;
     use serial_test::serial;
     use std::env;
     use test_case::test_case;
-    use crate::config::ConfigCache;
-
 
     fn parse_option_string(s: &Option<String>) -> String {
         match s {

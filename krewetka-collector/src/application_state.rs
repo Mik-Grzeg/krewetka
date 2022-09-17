@@ -1,16 +1,15 @@
-use std::fmt;
+use bytes::Bytes;
 use log::{debug, error, info};
-
+use std::fmt;
 
 use tokio::sync::mpsc;
 use tokio::task::{self};
 use tokio::time::{sleep, Duration};
 
 use crate::config::{ConfigCache, ConfigErr};
-use crate::importers;
 use crate::exporters;
+use crate::importers;
 use crate::settings::Configuration;
-
 
 const CONFIG_PATH: &str = "./krewetka.yaml";
 
@@ -32,7 +31,7 @@ pub struct HostIdentifier {
 
 impl Default for HostIdentifier {
     fn default() -> Self {
-        let os_release = match sys_info::os_release()  {
+        let os_release = match sys_info::os_release() {
             Ok(r) => r,
             Err(e) => {
                 error!("Unable to acquire information about os release. Setting it to unknown");
@@ -48,7 +47,10 @@ impl Default for HostIdentifier {
             }
         };
 
-        HostIdentifier { hostname, os_release }
+        HostIdentifier {
+            hostname,
+            os_release,
+        }
     }
 }
 
@@ -97,12 +99,10 @@ impl ApplicationState {
         let tx1 = tx.clone();
 
         // spawning task responsbile for importing data
-        let importer_task = task::spawn( async move {
-             importers::run(importer, tx1).await
-        });
+        let importer_task = task::spawn(async move { importers::run(importer, tx1).await });
 
         // watch buffer state
-        let watcher_task = task::spawn( async move {
+        let watcher_task = task::spawn(async move {
             while !tx.is_closed() {
                 sleep(Duration::from_secs(5)).await;
                 info!("current capacity of buffer: {}", tx.capacity());
@@ -111,7 +111,6 @@ impl ApplicationState {
 
         // export data
         let exporter = exporters::run(exporter, &mut rx, &identifier).await;
-
 
         importer_task.await;
         watcher_task.await;
