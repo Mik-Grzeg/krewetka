@@ -46,3 +46,10 @@ path = "src/main.rs"
 #[[bench]]
 #name = "exporter_bench"
 #harness = false
+
+[package.metadata.cross.target.armv7-unknown-linux-gnueabihf]
+pre-build = [
+    "dpkg --add-architecture armhf",
+    "apt-get update",
+    "apt-get install -y libzmq3-dev:armhf libssl-dev:armhf protobuf-compiler libprotobuf-dev"
+]

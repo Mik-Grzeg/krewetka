@@ -1,8 +1,0 @@
-**/target
-venv/
-**/krewetka.yaml
-docker-compose.yaml
-deploy
-dummy-importer
-.github
-Dockerfile
