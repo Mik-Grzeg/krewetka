@@ -6,10 +6,10 @@ COPY . .
 RUN cargo chef prepare --recipe-path recipe.json
 
 ####################################################################################################
-## Builder
+## Cacher
 ####################################################################################################
 
-FROM chef as builder
+FROM chef as cacher
 
 # Create appuser
 ENV USER=krewetka
@@ -24,7 +24,7 @@ RUN adduser \
     --uid "${UID}" \
     "${USER}"
 
-RUN apt-get update && apt-get install -y libzmq3-dev cmake protobuf-compiler libprotobuf-dev
+RUN apt-get update && apt-get install -y libzmq3-dev cmake
 
 WORKDIR /app
 COPY --from=planner /app/recipe.json recipe.json
@@ -32,10 +32,20 @@ COPY --from=planner /app/recipe.json recipe.json
 # This caches the dependency files similar to how @ckaserer's solution
 # does, but is handled solely through the `cargo-chef` library.
 RUN cargo chef cook --release --recipe-path recipe.json
-# Build the application
-COPY . .
 
-RUN cargo build
+####################################################################################################
+## Builder
+####################################################################################################
+
+FROM rust as builder
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y protobuf-compiler libprotobuf-dev
+
+COPY . .
+COPY --from=cacher /app/target target
+
+RUN cargo build --release
 
 ####################################################################################################
 ## Final image collector
@@ -43,13 +53,13 @@ RUN cargo build
 FROM debian:bookworm-slim as collector
 
 # Import from builder.
-COPY --from=builder /etc/passwd /etc/passwd
-COPY --from=builder /etc/group /etc/group
+COPY --from=cacher /etc/passwd /etc/passwd
+COPY --from=cacher /etc/group /etc/group
 
 WORKDIR /app
 
 # Copy our build
-COPY --from=builder /app/target/debug/krewetka-collector ./collector
+COPY --from=builder /app/target/release/krewetka-collector ./collector
 
 # Use an unprivileged user.
 USER krewetka:krewetka

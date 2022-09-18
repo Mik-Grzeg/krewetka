@@ -1,7 +1,7 @@
 use super::errors::ExporterError;
 use crate::application_state::HostIdentifier;
 use async_trait::async_trait;
-use log::{debug, error, info};
+use log::{debug, info};
 use tokio::sync::mpsc::Receiver;
 
 #[async_trait]
@@ -26,12 +26,6 @@ pub async fn run(exporter: impl Export, rx: &mut Receiver<Vec<u8>>, identifier: 
 mod tests {
     use super::*;
     use mockall::mock;
-    use pretty_assertions;
-    use rdkafka::error::KafkaError;
-    use rdkafka::message::{OwnedMessage, ToBytes};
-    use tokio::sync::mpsc::channel;
-    use tokio::task;
-    use tokio_test::block_on;
 
     mock! {
         pub Exporter {}

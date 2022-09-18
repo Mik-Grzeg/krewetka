@@ -84,7 +84,7 @@ impl ExporterVariants {
                 brokers: settings
                     .kafka_brokers
                     .ok_or(ConstructorErr::KafkaErr)?
-                    .split(",")
+                    .split(',')
                     .map(|s| s.to_string())
                     .collect(),
                 topic: settings.kafka_topic.ok_or(ConstructorErr::KafkaErr)?,
@@ -169,9 +169,9 @@ mod tests {
                         zmq_address: address,
                         zmq_queue_name: queue_name,
                     },
-                    source: source,
+                    source,
                 },
-                exporter: exporter
+                exporter
             },
             cfg
         );

@@ -1,17 +1,16 @@
-use std::sync::mpsc::Sender;
-
 use super::Transport;
 
+use crate::flow::FlowMessage;
 use async_trait::async_trait;
-use log::{error, info, warn};
+use bytes::BytesMut;
+use log::{debug, error, info, warn};
+use prost::Message as PBMessage;
 use rdkafka::{
     config::RDKafkaLogLevel,
-    consumer::{BaseConsumer, CommitMode, Consumer, ConsumerContext, Rebalance, StreamConsumer},
+    consumer::{CommitMode, Consumer, ConsumerContext, Rebalance, StreamConsumer},
     error::KafkaResult,
-    message::Headers,
     ClientConfig, ClientContext, Message, TopicPartitionList,
 };
-use tokio::sync::mpsc;
 
 #[derive(Debug, Clone)]
 pub struct KafkaSettings {
@@ -69,8 +68,9 @@ impl KafkaState {
 
 #[async_trait]
 impl Transport for KafkaState {
-    async fn consume(&self, tx: tokio::sync::mpsc::Sender<Vec<u8>>) {
+    async fn consume(&self, tx: tokio::sync::mpsc::Sender<FlowMessage>) {
         info!("Starting to consume messages from kafka...");
+        let _buf = BytesMut::with_capacity(4096);
         loop {
             let msg = match self.consumer.recv().await {
                 Ok(msg) => msg,
@@ -89,10 +89,26 @@ impl Transport for KafkaState {
                 }
             };
 
-            self.consumer
-                .commit_message(&msg, CommitMode::Async)
-                .unwrap();
-            tx.send(payload.to_owned()).await; // TODO handle error
+            // handling commiting error
+            if let Err(e) = self.consumer.commit_message(&msg, CommitMode::Async) {
+                error!("Unable to commit message in kafka: {}", e)
+            }
+
+            let decoded_msg: FlowMessage = match PBMessage::decode::<&[u8]>(payload) {
+                Ok(m) => {
+                    debug!("Received event: {:?}", m);
+                    m
+                }
+                Err(e) => {
+                    error!("Unable to decode event: {}", e);
+                    continue;
+                }
+            };
+
+            // handling channel sending error
+            if let Err(e) = tx.send(decoded_msg).await {
+                error!("Unable to put kafka event on channel: {}", e)
+            }
         }
     }
 }

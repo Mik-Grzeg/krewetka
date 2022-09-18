@@ -1111,6 +1111,7 @@ name = "krewetka-processor"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "bytes 1.2.1",
  "clickhouse-rs",
  "config",
  "env_logger",

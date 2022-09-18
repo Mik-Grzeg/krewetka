@@ -1,5 +1,4 @@
-use bytes::Bytes;
-use log::{debug, error, info};
+use log::{error, info};
 use std::fmt;
 
 use tokio::sync::mpsc;
@@ -33,7 +32,7 @@ impl Default for HostIdentifier {
     fn default() -> Self {
         let os_release = match sys_info::os_release() {
             Ok(r) => r,
-            Err(e) => {
+            Err(_e) => {
                 error!("Unable to acquire information about os release. Setting it to unknown");
                 String::from("unknown")
             }
@@ -41,7 +40,7 @@ impl Default for HostIdentifier {
 
         let hostname = match sys_info::hostname() {
             Ok(h) => h,
-            Err(e) => {
+            Err(_e) => {
                 error!("unable to acquire information about hostname. Settings it to unknown");
                 String::from("unknown")
             }
@@ -110,7 +109,7 @@ impl ApplicationState {
         });
 
         // export data
-        let exporter = exporters::run(exporter, &mut rx, &identifier).await;
+        exporters::run(exporter, &mut rx, &identifier).await;
 
         importer_task.await;
         watcher_task.await;
@@ -120,7 +119,7 @@ impl ApplicationState {
 }
 
 pub fn init_config() -> Result<(ConfigCache, Configuration), AppInitErr> {
-    let config_cache = ConfigCache::new(&CONFIG_PATH).map_err(AppInitErr::Config)?;
+    let config_cache = ConfigCache::new(CONFIG_PATH).map_err(AppInitErr::Config)?;
     let configuration = config_cache
         .get_config::<Configuration>()
         .map_err(AppInitErr::Config)?;

@@ -1,8 +1,7 @@
 use core::fmt;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use log::{debug, info};
-use rdkafka::message::ToBytes;
+
 use zmq::Socket;
 
 use async_trait::async_trait;
@@ -69,7 +68,7 @@ impl ZMQ {
 
         let boxed_subscriber = Box::new(MySubscriber(subscriber));
         ZMQ {
-            settings: settings,
+            settings,
             subscriber: boxed_subscriber,
         }
     }
@@ -89,8 +88,8 @@ impl Import for ZMQ {
             "String message: {}",
             std::str::from_utf8(received_slice).unwrap()
         ); // TODO remove that
-        let msg: FlowMessage = serde_json::from_slice(&received_slice)
-            .map_err(|e| ImporterError::DeserializationErr(e))?;
+        let msg: FlowMessage =
+            serde_json::from_slice(received_slice).map_err(ImporterError::DeserializationErr)?;
 
         debug!("Imported message: {:#?}", msg); // TODO remove that
         Ok(msg)
@@ -99,7 +98,6 @@ impl Import for ZMQ {
 
 #[cfg(test)]
 mod tests {
-    use std::iter::Inspect;
 
     use super::*;
     use crate::flow::FlowMessage;
@@ -107,9 +105,7 @@ mod tests {
     use pretty_assertions::assert_eq;
     use serde_json::error::Category;
     use test_case::case;
-    use tokio_test::{assert_err, block_on};
-    use zmq::Error;
-    use zmq::Socket;
+    use tokio_test::block_on;
 
     type RecvResult = Result<Vec<u8>, ImporterError>;
     mock! {
@@ -165,7 +161,7 @@ mod tests {
 
         let zmq = ZMQ {
             subscriber: Box::new(socket),
-            settings: settings,
+            settings,
         };
 
         let flow_msg = FlowMessage {

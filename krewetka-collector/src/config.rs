@@ -31,16 +31,15 @@ impl ConfigCache {
         let base_config_builder = ConfigBuilder::<DefaultState>::default();
         base_config_builder
             .add_source(File::with_name(global_config_path).required(false))
-            .add_source(Environment::with_prefix(&DEFAULT_ENV_VAR_PREFIX).separator("__"))
+            .add_source(Environment::with_prefix(DEFAULT_ENV_VAR_PREFIX).separator("__"))
             .build()
             .map_err(ConfigErr::Read)
     }
 
     pub fn get_config<'d, T: Deserialize<'d>>(&self) -> Result<T, ConfigErr> {
-        Ok(self
-            .config
+        self.config
             .clone()
             .try_deserialize()
-            .map_err(ConfigErr::Read)?)
+            .map_err(ConfigErr::Read)
     }
 }

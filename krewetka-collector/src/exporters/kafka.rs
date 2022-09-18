@@ -1,5 +1,3 @@
-use crate::application_state::HostIdentifier;
-use rdkafka::error::KafkaError;
 use rdkafka::Message;
 use std::fmt;
 
@@ -36,7 +34,6 @@ impl fmt::Debug for KafkaExporter {
         write!(f, "{:?}", self.settings)
     }
 }
-
 impl KafkaExporter {
     pub fn new(settings: KafkaSettings) -> Result<KafkaExporter, ExporterError> {
         let producer: FutureProducer = ClientConfig::new()
@@ -45,10 +42,7 @@ impl KafkaExporter {
             .create()
             .expect("Producer creation error");
 
-        Ok(KafkaExporter {
-            settings: settings,
-            producer: producer,
-        })
+        Ok(KafkaExporter { settings, producer })
     }
 }
 
@@ -65,8 +59,7 @@ impl Export for KafkaExporter {
                     .headers(OwnedHeaders::new().add::<str>("host-identifier", identifier)),
                 Duration::from_secs(0),
             )
-            .await
-            .map_err(|e| e.into());
+            .await;
 
         // describe if it was successfull
         match result {
