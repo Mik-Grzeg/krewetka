@@ -27,8 +27,7 @@ services:
 
   krewetka-collector:
     build: 
-      context: .
-      target: collector 
+      context: ./krewetka-collector
     depends_on:
       - broker
       - importer
@@ -42,8 +41,7 @@ services:
 
   krewetka-processor:
     build: 
-      context: .
-      target: processor
+      context: ./krewetka-processor
     depends_on:
       - broker
       - importer

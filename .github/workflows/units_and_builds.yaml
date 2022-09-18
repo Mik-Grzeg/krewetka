@@ -1,0 +1,79 @@
+name: Testing action
+on: [push]
+
+jobs:
+  collector:
+    defaults:
+      run:
+        working-directory: krewetka-collector
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1
+
+      - name: Cargo cache
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo
+          key: ${{ runner.os }}-cargo-collector-${{ hashFiles('Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-collector-${{ hashFiles('Cargo.toml') }}
+            ${{ runner.os }}-cargo-collector
+
+      - name: Target cache
+        uses: actions/cache@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-target-collector-${{ hashFiles('Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-target-collector-${{ hashFiles('Cargo.toml') }}
+            ${{ runner.os }}-cargo-target-collector
+
+      - name: Test
+        run: cargo test --verbose
+
+      - name: Lint
+        run: cargo clippy --verbose
+
+      # - name: Install cross
+      #   run: wget -c https://github.com/cross-rs/cross/releases/download/v0.2.4/cross-x86_64-unknown-linux-gnu.tar.gz -O - | tar -xz
+
+      # - name: Compile for arm
+      #   run: ./cross build --target armv7-unknown-linux-gnueabihf --verbose 
+
+  processor:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: krewetka-processor
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1
+
+      - name: Cargo cache
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo
+          key: ${{ runner.os }}-cargo-processor-${{ hashFiles('Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-processor-${{ hashFiles('Cargo.toml') }}
+            ${{ runner.os }}-cargo-processor
+
+      - name: Target cache
+        uses: actions/cache@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-target-processor-${{ hashFiles('Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-target-processor-${{ hashFiles('Cargo.toml') }}
+            ${{ runner.os }}-cargo-target-processor
+
+      - name: Test
+        run: cargo test --verbose
+
+      - name: Lint
+        run: cargo clippy --verbose
