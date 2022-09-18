@@ -10,7 +10,6 @@ pub enum ImporterVariants {
     ZMQ,
 }
 
-
 #[derive(Debug)]
 pub enum ConstructorErr {
     ZMQErr,

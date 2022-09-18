@@ -14,6 +14,9 @@ fn main() {
             ".flow.FlowMessage",
             "#[serde(rename_all(deserialize = \"SCREAMING_SNAKE_CASE\"))]",
         )
-        .compile(&[&proto_path_ancestors.next().unwrap()], &[&proto_path_ancestors.next().unwrap()])
+        .compile(
+            &[&proto_path_ancestors.next().unwrap()],
+            &[&proto_path_ancestors.next().unwrap()],
+        )
         .unwrap_or_else(|e| panic!("Failed to compile protos {:?}", e));
 }
