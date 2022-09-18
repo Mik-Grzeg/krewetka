@@ -1,5 +1,4 @@
 fn main() {
-
     let proto_path = match std::env::var("PROTO_PATH") {
         Ok(val) => val,
         Err(_) => "proto/flow.proto".to_string(),

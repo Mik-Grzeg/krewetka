@@ -14,7 +14,7 @@ async fn main() {
     info!("Starting application");
     let state = match ApplicationState::new() {
         Ok(s) => s,
-        Err(e) => panic!("ApplicationState init error: {:?}",  e),
+        Err(e) => panic!("ApplicationState init error: {:?}", e),
     };
 
     state.init().await;
