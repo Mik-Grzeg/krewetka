@@ -40,7 +40,7 @@ RUN cargo chef cook --release --recipe-path recipe.json
 FROM rust as builder
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y protobuf-compiler libprotobuf-dev
+RUN apt-get update && apt-get install -y protobuf-compiler libprotobuf-dev cmake
 
 COPY . .
 COPY --from=cacher /app/target target
@@ -88,4 +88,4 @@ COPY --from=builder /app/target/release/krewetka-migrator ./migrator
 USER krewetka:krewetka
 
 ENV RUST_LOG="debug"
-CMD [ "/app/migrator" ]
+CMD [ "/app/migrator", "apply", "./migrations" ]

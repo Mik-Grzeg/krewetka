@@ -1,4 +1,4 @@
-use crate::settings::Settings;
+use crate::settings::ProcessorSettings;
 use crate::storage::{astorage::StorageError, clickhouse::ClickhouseState};
 use crate::transport::kafka::KafkaState;
 use crate::transport::{kafka, Transport};
@@ -9,10 +9,10 @@ use serde::Deserialize;
 use tokio::sync::mpsc;
 use tokio::task;
 use tokio::time::{interval, Duration};
+use crate::consts::DEFAULT_ENV_VAR_PREFIX;
 
 use crate::transport::WrappedFlowMessage;
 
-const DEFAULT_ENV_VAR_PREFIX: &str = "KREWETKA";
 
 #[derive(Debug)]
 pub enum ConfigErr {
@@ -26,11 +26,11 @@ pub struct ApplicationState {
     clickhouse_state: ClickhouseState,
 }
 
-impl ApplicationState {
-    pub fn get_config<'d, T: Deserialize<'d>>(config: &Config) -> Result<T, ConfigErr> {
-        config.clone().try_deserialize().map_err(ConfigErr::Read)
-    }
+pub fn get_config<'d, T: Deserialize<'d>>(config: &Config) -> Result<T, ConfigErr> {
+    config.clone().try_deserialize().map_err(ConfigErr::Read)
+}
 
+impl ApplicationState {
     pub fn new() -> Result<Self, ConfigErr> {
         let base_config_builder = ConfigBuilder::<DefaultState>::default();
         let config = base_config_builder
@@ -40,7 +40,7 @@ impl ApplicationState {
 
         // deserialize env config
         let deserialized_config =
-            Self::get_config::<Settings>(&config).expect("Getting config failed");
+            get_config::<ProcessorSettings>(&config).expect("Getting config failed");
 
         // set kafka settings
         let kafka_state = kafka::KafkaState::new(
@@ -48,12 +48,7 @@ impl ApplicationState {
             deserialized_config.kafka_brokers,
         );
         // set clickhouse settings
-        let clickhouse_state = ClickhouseState::new(
-            deserialized_config.clickhouse_host,
-            deserialized_config.clickhouse_port,
-            deserialized_config.clickhouse_user,
-            deserialized_config.clickhouse_password,
-        );
+        let clickhouse_state = ClickhouseState::new(deserialized_config.clickhouse_settings);
 
         Ok(ApplicationState {
             config,

@@ -49,10 +49,10 @@ services:
     environment:
       KREWETKA__KAFKA_BROKERS: "broker:9092"
       KREWETKA__KAFKA_TOPIC: "flows"
-      KREWETKA__CLICKHOUSE_HOST: "clickhouse"
-      KREWETKA__CLICKHOUSE_PORT: 9000
-      KREWETKA__CLICKHOUSE_USER: "myuser"
-      KREWETKA__CLICKHOUSE_PASSWORD: "password"
+      KREWETKA__CLICKHOUSE_SETTINGS__HOST: "clickhouse"
+      KREWETKA__CLICKHOUSE_SETTINGS__PORT: 9000
+      KREWETKA__CLICKHOUSE_SETTINGS__USER: "myuser"
+      KREWETKA__CLICKHOUSE_SETTINGS__PASSWORD: "password"
 
   krewetka-migrator:
     build:
@@ -60,6 +60,11 @@ services:
       target: migrator
     depends_on:
       - clickhouse
+    environment:
+      KREWETKA__CLICKHOUSE_SETTINGS__HOST: "clickhouse"
+      KREWETKA__CLICKHOUSE_SETTINGS__PORT: 9000
+      KREWETKA__CLICKHOUSE_SETTINGS__USER: "myuser"
+      KREWETKA__CLICKHOUSE_SETTINGS__PASSWORD: "password"
 
   clickhouse:
     image: clickhouse/clickhouse-server:22.6.8.35

@@ -1,10 +1,13 @@
 use crate::migrator::migrate::{AbstractMigratorSql, MigrationFiles, MigratorError};
 use crate::storage::clickhouse::ClickhouseState;
+use crate::migrator::creator::hasher;
 use async_trait::async_trait;
+use clickhouse_rs::{ClientHandle, Block};
 use log::{error, info, warn};
 use std::fs::{DirEntry, File};
 use std::io::Read;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::fs;
 
 pub struct ClickhouseMigrations {
     validated_migration_scripts: Option<MigrationFiles>,
@@ -18,10 +21,65 @@ impl ClickhouseMigrations {
             clickhouse_state: state,
         }
     }
+
+    async fn apply_migration(&self, path: &PathBuf, client: &mut ClientHandle) -> Result<(), MigratorError> {
+        let file_name = path.file_name().unwrap().to_str().unwrap();
+        info!("reading migration script: {}", file_name);
+
+        let ddl = match fs::read_to_string(&path) {
+            Ok(s) => s,
+            Err(e) => {
+                error!("unable to read: {}", file_name);
+                return Err(MigratorError::ReadingMigrationFilesFailed(Box::new(e)))
+            }
+        };
+
+        client
+            .execute(&ddl)
+            .await
+            .map_err(|e| MigratorError::ApplyFailed(Box::new(e)))?;
+        
+        self.mark_migration_as_applied(&ddl, path, client).await?;
+        Ok(())
+    }
+
+    async fn mark_migration_as_applied(&self, ddl: &str, path: &PathBuf, client: &mut ClientHandle) -> Result<(), MigratorError> {
+        let path = path.to_str().unwrap();
+        let block = Block::new()
+            .column("migration_hash", vec![hasher(ddl)])
+            .column("migration_file_name", vec![path]);
+
+        client
+            .insert("_db_migrations", block)
+            .await
+            .map_err(|e| MigratorError::SettingsMigrationAsAppliedFailed(Box::new(e)))?;
+
+        info!("{} migration set as applied", path);
+
+        Ok(())
+    }
 }
 
 #[async_trait]
 impl AbstractMigratorSql for ClickhouseMigrations {
+    async fn run_migrations(&self) -> Result<(), MigratorError> {
+        let mut client = self
+            .clickhouse_state
+            .pool
+            .as_ref()
+            .get_handle()
+            .await
+            .map_err(|e| MigratorError::InitializationFailed(Box::new(e)))?;
+
+        let migrations = &self.validated_migration_scripts.as_ref().unwrap().recognized_files;
+        info!("{} migration files found", migrations.len());
+        for path in migrations {
+            self.apply_migration(path, &mut client).await?;
+        }
+
+        Ok(())
+    }
+
     fn get_migrations_from_dir(&mut self, dir: &Path) -> Option<()> {
         let mut files_sorted_by_timestamp = dir
             .read_dir()
@@ -51,7 +109,8 @@ impl AbstractMigratorSql for ClickhouseMigrations {
             }
         }
 
-        if migration_scripts.recognized_files.is_empty() {
+        info!("Matched and validated {} files", migration_scripts.recognized_files.len());
+        if !migration_scripts.recognized_files.is_empty() {
             self.validated_migration_scripts = Some(migration_scripts);
             return Some(());
         }

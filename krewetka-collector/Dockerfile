@@ -40,7 +40,7 @@ RUN cargo chef cook --release --recipe-path recipe.json
 FROM rust as builder
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y protobuf-compiler libprotobuf-dev
+RUN apt-get update && apt-get install -y protobuf-compiler libprotobuf-dev cmake
 
 COPY . .
 COPY --from=cacher /app/target target

@@ -23,6 +23,8 @@ tokio-stream = "0.1.10"
 url = "2.3.1"
 regex = "1.6.0"
 lazy_static = "1.4.0"
+clap = { version = "4.0.0-rc.2", features = ["derive"] }
+chrono = "0.4.22"
 
 [build-dependencies]
 tonic-build = "0.8.0"

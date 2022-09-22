@@ -1,15 +1,22 @@
 use super::astorage::{AStorage, StorageError};
 use clickhouse_rs::Pool;
+use serde::Deserialize;
 
 use async_trait::async_trait;
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct ClickhouseSettings {
     host: String,
     port: u16,
     user: String,
     password: String,
+}
+
+impl From<ClickhouseSettings> for ClickhouseState {
+    fn from(settings: ClickhouseSettings) -> ClickhouseState {
+        ClickhouseState::new(settings)
+    }
 }
 
 impl std::fmt::Display for ClickhouseSettings {
@@ -28,13 +35,7 @@ pub struct ClickhouseState {
 }
 
 impl ClickhouseState {
-    pub fn new(host: String, port: u16, user: String, password: String) -> Self {
-        let settings = ClickhouseSettings {
-            host,
-            port,
-            user,
-            password,
-        };
+    pub fn new(settings: ClickhouseSettings) -> Self {
         let dsn = settings.to_string();
 
         let pool = Arc::new(Pool::new(dsn));

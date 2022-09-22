@@ -1,0 +1,1 @@
+pub const DEFAULT_ENV_VAR_PREFIX: &str = "KREWETKA";
