@@ -1,3 +1,4 @@
+use crate::consts::DEFAULT_ENV_VAR_PREFIX;
 use crate::settings::ProcessorSettings;
 use crate::storage::{astorage::StorageError, clickhouse::ClickhouseState};
 use crate::transport::kafka::KafkaState;
@@ -9,10 +10,8 @@ use serde::Deserialize;
 use tokio::sync::mpsc;
 use tokio::task;
 use tokio::time::{interval, Duration};
-use crate::consts::DEFAULT_ENV_VAR_PREFIX;
 
 use crate::transport::WrappedFlowMessage;
-
 
 #[derive(Debug)]
 pub enum ConfigErr {

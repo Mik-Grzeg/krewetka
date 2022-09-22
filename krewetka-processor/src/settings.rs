@@ -1,6 +1,5 @@
-use serde::Deserialize;
 use crate::storage::clickhouse::ClickhouseSettings;
-
+use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct ProcessorSettings {

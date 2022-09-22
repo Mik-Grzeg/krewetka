@@ -1,9 +1,9 @@
+use chrono::offset::Local;
 use std::collections::hash_map::DefaultHasher;
 use std::fs::File;
-use chrono::offset::Local;
-use std::io::Result;
 use std::hash::Hash;
 use std::hash::Hasher;
+use std::io::Result;
 use std::path::PathBuf;
 
 pub fn hasher<T: Hash>(t: T) -> u64 {

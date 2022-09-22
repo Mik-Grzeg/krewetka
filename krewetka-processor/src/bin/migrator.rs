@@ -2,9 +2,8 @@ use lib::migrator::cli::ActionRunner;
 
 use std::error::Error;
 
-
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>>{
+async fn main() -> Result<(), Box<dyn Error>> {
     // Setup logger
     let env = env_logger::Env::default();
     env_logger::init_from_env(env);
