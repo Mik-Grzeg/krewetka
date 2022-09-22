@@ -1,19 +1,15 @@
-use std::error::Error;
-
 use crate::settings::Settings;
+use crate::storage::{astorage::StorageError, clickhouse::ClickhouseState};
+use crate::transport::kafka::KafkaState;
 use crate::transport::{kafka, Transport};
 use config::builder::DefaultState;
 use config::{Config, ConfigBuilder, Environment};
-use log::{debug, error};
+use log::error;
 use serde::Deserialize;
 use tokio::sync::mpsc;
 use tokio::task;
 use tokio::time::{interval, Duration};
-use crate::transport::kafka::{KafkaSettings, KafkaState};
-use crate::storage::{astorage::StorageError, clickhouse::ClickhouseState};
-use clickhouse_rs::Pool;
 
-use crate::flow::FlowMessage;
 use crate::transport::WrappedFlowMessage;
 
 const DEFAULT_ENV_VAR_PREFIX: &str = "KREWETKA";
@@ -32,10 +28,7 @@ pub struct ApplicationState {
 
 impl ApplicationState {
     pub fn get_config<'d, T: Deserialize<'d>>(config: &Config) -> Result<T, ConfigErr> {
-        config
-            .clone()
-            .try_deserialize()
-            .map_err(ConfigErr::Read)
+        config.clone().try_deserialize().map_err(ConfigErr::Read)
     }
 
     pub fn new() -> Result<Self, ConfigErr> {
@@ -45,15 +38,14 @@ impl ApplicationState {
             .build()
             .map_err(ConfigErr::Read)?;
 
-
         // deserialize env config
-        let deserialized_config = Self::get_config::<Settings>(&config)
-            .expect("Getting config failed");
+        let deserialized_config =
+            Self::get_config::<Settings>(&config).expect("Getting config failed");
 
         // set kafka settings
         let kafka_state = kafka::KafkaState::new(
             deserialized_config.kafka_topic,
-            deserialized_config.kafka_brokers
+            deserialized_config.kafka_brokers,
         );
         // set clickhouse settings
         let clickhouse_state = ClickhouseState::new(
@@ -63,7 +55,6 @@ impl ApplicationState {
             deserialized_config.clickhouse_password,
         );
 
-
         Ok(ApplicationState {
             config,
             kafka_state,
@@ -72,20 +63,23 @@ impl ApplicationState {
     }
 
     pub async fn init(&self) {
-        let (tx, mut rx) = mpsc::channel::<WrappedFlowMessage>(20);
+        let (tx, _rx) = mpsc::channel::<WrappedFlowMessage>(20);
         let mut ping_interval = interval(Duration::from_secs(15));
 
-        let mut client = self.
-            clickhouse_state
+        let mut client = self
+            .clickhouse_state
             .pool
             .as_ref()
             .get_handle()
             .await
-            .map_err(|e| StorageError::Database(Box::new(e))).unwrap();
+            .map_err(|e| StorageError::Database(Box::new(e)))
+            .unwrap();
 
-        task::spawn( async move {
+        task::spawn(async move {
             loop {
-                if let Err(e) = client.ping().await {  error!("Ping does pong: {}", e)  };
+                if let Err(e) = client.ping().await {
+                    error!("Ping does pong: {}", e)
+                };
                 ping_interval.tick().await;
             }
         });

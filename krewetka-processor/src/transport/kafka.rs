@@ -1,8 +1,5 @@
-use std::iter::FilterMap;
-
 use super::Transport;
 
-use tokio_stream::{self as stream, StreamExt};
 use crate::flow::FlowMessage;
 use async_trait::async_trait;
 use bytes::BytesMut;
@@ -14,6 +11,7 @@ use rdkafka::{
     error::KafkaResult,
     ClientConfig, ClientContext, Message, TopicPartitionList,
 };
+use tokio_stream::StreamExt;
 
 #[derive(Debug, Clone)]
 pub struct KafkaSettings {
@@ -69,15 +67,12 @@ impl KafkaState {
     }
 }
 
-
-use rdkafka::message::FromBytes;
-use prost::DecodeError;
-use std::sync::{Arc, Mutex};
 use super::utils::WrappedFlowMessage;
+use std::sync::{Arc, Mutex};
 
 #[async_trait]
 impl Transport for KafkaState {
-    async fn consume_batch(&self, tx: tokio::sync::mpsc::Sender<WrappedFlowMessage>){
+    async fn consume_batch(&self, tx: tokio::sync::mpsc::Sender<WrappedFlowMessage>) {
         info!("Started consuming kafka stream...");
 
         let mut streamer = self.consumer.stream();
@@ -85,27 +80,31 @@ impl Transport for KafkaState {
         while let Some(event) = streamer.next().await {
             warn!("Iteration: {}", i); // TODO remove that debugging statement
             match event {
-                Ok(ev) => { match ev.payload_view::<[u8]>(){
-                    Some(Ok(f)) =>  {
-                        let deserialized_msg = WrappedFlowMessage(
-                            Arc::new(Mutex::new(PBMessage::decode::<&[u8]>(f).unwrap()))
-                        ); // TODO properly handle error
+                Ok(ev) => {
+                    match ev.payload_view::<[u8]>() {
+                        Some(Ok(f)) => {
+                            let deserialized_msg = WrappedFlowMessage(Arc::new(Mutex::new(
+                                PBMessage::decode::<&[u8]>(f).unwrap(),
+                            ))); // TODO properly handle error
 
-                        debug!("Deserialized kafka event: {:?}", deserialized_msg.0);
-                        tx.send(deserialized_msg).await
-                    },
-                    Some(Err(e)) => {
-                        error!("Unable to decode kafka even into flow message: {:?}", e);
-                        continue;
-                    },
-                    _ => { continue; },
-                }},
+                            debug!("Deserialized kafka event: {:?}", deserialized_msg.0);
+                            tx.send(deserialized_msg).await
+                        }
+                        Some(Err(e)) => {
+                            error!("Unable to decode kafka even into flow message: {:?}", e);
+                            continue;
+                        }
+                        _ => {
+                            continue;
+                        }
+                    }
+                }
                 Err(e) => {
                     error!("Unable to receive kafka event: {}", e);
                     continue;
                 }
             };
-            i+=1; // TODO debugging purposes
+            i += 1; // TODO debugging purposes
         }
     }
 
@@ -120,7 +119,7 @@ impl Transport for KafkaState {
                     break;
                 }
             };
-//
+            //
             let payload = match msg.payload_view::<[u8]>() {
                 Some(Ok(s)) => s,
                 None => continue,
@@ -129,12 +128,12 @@ impl Transport for KafkaState {
                     continue;
                 }
             };
-//
+            //
             // handling commiting error
             if let Err(e) = self.consumer.commit_message(&msg, CommitMode::Async) {
                 error!("Unable to commit message in kafka: {}", e)
             }
-//
+            //
             let decoded_msg: FlowMessage = match PBMessage::decode::<&[u8]>(payload) {
                 Ok(m) => {
                     debug!("Received event: {:?}", m);
@@ -145,7 +144,7 @@ impl Transport for KafkaState {
                     continue;
                 }
             };
-//
+            //
             // handling channel sending error
             if let Err(e) = tx.send(decoded_msg).await {
                 error!("Unable to put kafka event on channel: {}", e)

@@ -1,11 +1,10 @@
 use crate::migrator::migrate::{AbstractMigratorSql, MigrationFiles, MigratorError};
 use crate::storage::clickhouse::ClickhouseState;
+use async_trait::async_trait;
+use log::{error, info, warn};
+use std::fs::{DirEntry, File};
 use std::io::Read;
 use std::path::Path;
-use std::fs::{File, ReadDir, DirEntry};
-use async_trait::async_trait;
-use log::{info, warn, debug, error};
-
 
 pub struct ClickhouseMigrations {
     validated_migration_scripts: Option<MigrationFiles>,
@@ -23,23 +22,23 @@ impl ClickhouseMigrations {
 
 #[async_trait]
 impl AbstractMigratorSql for ClickhouseMigrations {
-    fn get_migrations_from_dir(&mut self, dir: &Path) -> Option<()>{
-
+    fn get_migrations_from_dir(&mut self, dir: &Path) -> Option<()> {
         let mut files_sorted_by_timestamp = dir
             .read_dir()
             .expect("reading directory failed")
-            .filter_map(|f|  match f {
+            .filter_map(|f| match f {
                 Ok(f) => Some(f),
-                Err(e) => None,
+                Err(_e) => None,
             })
             .collect::<Vec<DirEntry>>();
 
-            files_sorted_by_timestamp
+        files_sorted_by_timestamp
             .sort_by(|f1, f2| f1.file_name().partial_cmp(&f2.file_name()).unwrap());
 
-
         // validate files
-        let mut migration_scripts = MigrationFiles{ recognized_files: Vec::new() };
+        let mut migration_scripts = MigrationFiles {
+            recognized_files: Vec::new(),
+        };
         for file in files_sorted_by_timestamp {
             let file_name = file.file_name();
 
@@ -54,20 +53,28 @@ impl AbstractMigratorSql for ClickhouseMigrations {
 
         if migration_scripts.recognized_files.is_empty() {
             self.validated_migration_scripts = Some(migration_scripts);
-            return Some(())
+            return Some(());
         }
         None
     }
 
-    fn prepare_migrations(&self) -> () {
+    fn prepare_migrations(&self) {
         let mut migration_to_apply = String::new();
-        for script in &self.validated_migration_scripts.as_ref().unwrap().recognized_files {
+        for script in &self
+            .validated_migration_scripts
+            .as_ref()
+            .unwrap()
+            .recognized_files
+        {
             let mut f = match File::open(script) {
                 Ok(f) => f,
-                Err(e) =>  { error!("Unable to open file: {}", script.display()); continue},
+                Err(_e) => {
+                    error!("Unable to open file: {}", script.display());
+                    continue;
+                }
             };
 
-            if let Err(e) = f.read_to_string(&mut migration_to_apply) {
+            if let Err(_e) = f.read_to_string(&mut migration_to_apply) {
                 error!("Unable to read file: {}", script.display());
             }
         }
@@ -93,7 +100,7 @@ impl AbstractMigratorSql for ClickhouseMigrations {
         "#;
         match client.execute(ddl).await {
             Ok(_) => info!("create migration table if not exists [PASSED]"),
-            Err(e) =>  panic!("create migration table if not exists [FAILED]"),
+            Err(_e) => panic!("create migration table if not exists [FAILED]"),
         };
 
         Ok(())

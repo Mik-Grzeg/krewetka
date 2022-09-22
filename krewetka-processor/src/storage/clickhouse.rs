@@ -1,8 +1,8 @@
-use clickhouse_rs::{Pool, types::{Block, Options}};
-use super::astorage::{StorageError, AStorage};
-use url::Url;
-use std::sync::Arc;
+use super::astorage::{AStorage, StorageError};
+use clickhouse_rs::Pool;
+
 use async_trait::async_trait;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct ClickhouseSettings {
@@ -14,7 +14,11 @@ pub struct ClickhouseSettings {
 
 impl std::fmt::Display for ClickhouseSettings {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "tcp://{}:{}@{}:{}/default?compression=lz4", self.user, self.password, self.host, self.port)
+        write!(
+            f,
+            "tcp://{}:{}@{}:{}/default?compression=lz4",
+            self.user, self.password, self.host, self.port
+        )
     }
 }
 
@@ -29,30 +33,25 @@ impl ClickhouseState {
             host,
             port,
             user,
-            password
+            password,
         };
         let dsn = settings.to_string();
 
-
         let pool = Arc::new(Pool::new(dsn));
 
-        Self {
-            settings,
-            pool,
-        }
+        Self { settings, pool }
     }
 }
 
 #[async_trait]
 impl AStorage for ClickhouseState {
     async fn stash(&self) -> Result<(), StorageError> {
-        let mut client = self
+        let _client = self
             .pool
             .as_ref()
             .get_handle()
             .await
             .map_err(|e| StorageError::Database(Box::new(e)))?;
-
 
         Ok(())
     }
