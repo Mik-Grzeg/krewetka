@@ -26,7 +26,7 @@ services:
 
 
   krewetka-collector:
-    build: 
+    build:
       context: ./krewetka-collector
     depends_on:
       - broker
@@ -40,11 +40,33 @@ services:
       KREWETKA__EXPORTER__SETTINGS__KAFKA_TOPIC: "flows"
 
   krewetka-processor:
-    build: 
+    build:
       context: ./krewetka-processor
+      target: processor
     depends_on:
       - broker
       - importer
     environment:
       KREWETKA__KAFKA_BROKERS: "broker:9092"
       KREWETKA__KAFKA_TOPIC: "flows"
+      KREWETKA__CLICKHOUSE_HOST: "clickhouse"
+      KREWETKA__CLICKHOUSE_PORT: 9000
+      KREWETKA__CLICKHOUSE_USER: "myuser"
+      KREWETKA__CLICKHOUSE_PASSWORD: "password"
+
+  krewetka-migrator:
+    build:
+      context: ./krewetka-processor
+      target: migrator
+    depends_on:
+      - clickhouse
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:22.6.8.35
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    environment:
+      CLICKHOUSE_USER: "myuser"
+      CLICKHOUSE_PASSWORD: "password"

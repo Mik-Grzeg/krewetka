@@ -66,3 +66,26 @@ USER krewetka:krewetka
 
 ENV RUST_LOG="debug"
 CMD [ "/app/processor" ]
+
+####################################################################################################
+## Final image migrator 
+####################################################################################################
+FROM debian:bookworm-slim as migrator 
+
+# Import from builder.
+COPY --from=cacher /etc/passwd /etc/passwd
+COPY --from=cacher /etc/group /etc/group
+
+
+WORKDIR /app
+
+COPY ./src/migrator/clickhouse/migrations/ ./migrations
+
+# Copy our build
+COPY --from=builder /app/target/release/krewetka-migrator ./migrator
+
+# Use an unprivileged user.
+USER krewetka:krewetka
+
+ENV RUST_LOG="debug"
+CMD [ "/app/migrator" ]

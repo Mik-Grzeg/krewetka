@@ -56,6 +56,10 @@ FROM debian:bookworm-slim as collector
 COPY --from=cacher /etc/passwd /etc/passwd
 COPY --from=cacher /etc/group /etc/group
 
+# to remove
+RUN apt-get update && apt-get install -yy curl
+#
+
 WORKDIR /app
 
 # Copy our build
