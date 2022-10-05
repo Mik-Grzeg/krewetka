@@ -79,7 +79,7 @@ COPY --from=cacher /etc/group /etc/group
 
 WORKDIR /app
 
-COPY ./src/migrator/clickhouse/migrations/ ./migrations
+COPY --from=builder /app/src/migrator/clickhouse/migrations/ ./migrations
 
 # Copy our build
 COPY --from=builder /app/target/release/krewetka-migrator ./migrator
