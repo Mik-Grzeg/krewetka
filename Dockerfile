@@ -5,10 +5,10 @@ WORKDIR /classifier
 RUN apt-get update && \
     apt-get install -yy protobuf-compiler
 
-COPY requirements.txt .
+COPY classification/requirements.txt .
 RUN pip3 install -r requirements.txt
 
-COPY classifier_server.py flow-or-malicious.model ./
+COPY classification/classifier_server.py classification/flow-or-malicious.model ./
 COPY proto ./proto
 
 RUN  python3 -m grpc_tools.protoc -I=. --python_out=. --grpc_python_out=. ./proto/flow.proto
