@@ -9,10 +9,16 @@ from sklearn.tree import DecisionTreeClassifier
 class FlowMessageClassifierServicer(flow_pb2_grpc.FlowMessageClassifierServicer):
 
     def ClassifyStreaming(self, request_iterator, context):
+        print('mega printa')
         for msg in request_iterator:
             result = Classifier.classify(msg)
-            print(result)
-            yield flow_pb2.FlowMessageClass(malicious = bool(random.getrandbits(1)))
+
+            if result[0] == 1:
+                result = True 
+            else:
+                result = False
+            
+            yield flow_pb2.FlowMessageClass(malicious = result)
  
 
 class Classifier:
@@ -34,6 +40,7 @@ class Classifier:
         ]])
 
 def serve():
+    print('serving')
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     flow_pb2_grpc.add_FlowMessageClassifierServicer_to_server(
         FlowMessageClassifierServicer(), server

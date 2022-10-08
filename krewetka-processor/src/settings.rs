@@ -10,6 +10,8 @@ pub struct ProcessorSettings {
     // pub clickhouse_host: String,
     // pub clickhouse_port: u16,
     pub clickhouse_settings: ClickhouseSettings,
+    pub grpc_classification_port: u16,
+    pub grpc_classification_host: String,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]

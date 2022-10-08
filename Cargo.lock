@@ -1046,6 +1046,7 @@ dependencies = [
 name = "krewetka-processor"
 version = "0.1.0"
 dependencies = [
+ "async-stream",
  "async-trait",
  "bytes",
  "chrono",
@@ -2231,6 +2232,7 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]

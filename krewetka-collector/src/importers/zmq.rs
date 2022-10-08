@@ -116,8 +116,8 @@ mod tests {
         }
     }
 
-    #[case(77, 1, 53, "10.0.0.1".to_string(), "10.0.0.2".to_string(), 17, 56341, 61, 1, "5.126".to_string(), 0, 12, None; "ensure correct input is deserialized as it should, with no errors")]
-    #[case(77, 1, 53, "".to_string(), "".to_string(), 17, 56341, 61, 1, "".to_string(), 0, 12, Some(Category::Data); "ensure partially missing data results in error")]
+    #[case(77, 1, 53, "10.0.0.1".to_string(), "10.0.0.2".to_string(), 17, 56341, 61, 1, 0.2, 0, 12, None; "ensure correct input is deserialized as it should, with no errors")]
+    #[case(77, 1, 53, "".to_string(), "".to_string(), 17, 56341, 61, 1, 3.2, 0, 12, Some(Category::Data); "ensure partially missing data results in error")]
     fn test_import_zmq(
         out_bytes: u64,
         out_pkts: u64,
@@ -128,7 +128,7 @@ mod tests {
         l4_src_port: u32,
         in_bytes: u64,
         in_pkts: u64,
-        l7_proto: String,
+        l7_proto: f32,
         tcp_flags: u32,
         flow_duration_milliseconds: u64,
         de_error_category: Option<serde_json::error::Category>,

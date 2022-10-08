@@ -3,7 +3,7 @@ use crate::migrator::migrate::{AbstractMigratorSql, MigrationFiles, MigratorErro
 use crate::storage::clickhouse::ClickhouseState;
 use async_trait::async_trait;
 use clickhouse_rs::{Block, ClientHandle};
-use log::{error, info, warn};
+use log::{error, info, warn, debug};
 use std::fs;
 use std::fs::{DirEntry, File};
 use std::io::Read;
@@ -84,7 +84,7 @@ impl ClickhouseMigrations {
                 let f_name = f.to_str().unwrap();
                 let applied = block.iter().any(|i| i == f_name);
                 if applied { info!("Migration from file {} already applied", f_name) };
-                applied
+                !applied
             });
     }
 }
@@ -110,7 +110,7 @@ impl AbstractMigratorSql for ClickhouseMigrations {
         let inital_number_of_migration_files = migrations.len();
         info!("{} migration files found", inital_number_of_migration_files);
         self.ignore_applied_migrations(&mut client, &mut migrations).await;
-        info!("{} migration has already been applied", initial_number_of_migration_files - migrations.len());
+        info!("{} migration has already been applied", inital_number_of_migration_files - migrations.len());
 
         for path in migrations { self.apply_migration(&path, &mut client).await?; };
 

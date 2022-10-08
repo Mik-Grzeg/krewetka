@@ -3,6 +3,8 @@ use super::Transport;
 use crate::pb::FlowMessage;
 use async_trait::async_trait;
 use bytes::BytesMut;
+use chrono::{DateTime, Utc};
+use crate::transport::FlowMessageWithMetadata;
 use log::{debug, error, info, warn};
 use prost::Message as PBMessage;
 use rdkafka::{
@@ -67,12 +69,11 @@ impl KafkaState {
     }
 }
 
-use super::utils::WrappedFlowMessage;
 use std::sync::{Arc, Mutex};
 
 #[async_trait]
 impl Transport for KafkaState {
-    async fn consume_batch(&self, tx: tokio::sync::mpsc::Sender<WrappedFlowMessage>) {
+    async fn consume_batch(&self, tx: tokio::sync::broadcast::Sender<FlowMessageWithMetadata>) {
         info!("Started consuming kafka stream...");
 
         let mut streamer = self.consumer.stream();
@@ -83,12 +84,17 @@ impl Transport for KafkaState {
                 Ok(ev) => {
                     match ev.payload_view::<[u8]>() {
                         Some(Ok(f)) => {
-                            let deserialized_msg = WrappedFlowMessage(Arc::new(Mutex::new(
-                                PBMessage::decode::<&[u8]>(f).unwrap(),
-                            ))); // TODO properly handle error
+                            let deserialized_msg: FlowMessage = PBMessage::decode::<&[u8]>(f).unwrap(); // TODO properly handle error
 
-                            debug!("Deserialized kafka event: {:?}", deserialized_msg.0);
-                            tx.send(deserialized_msg).await
+                            let msg_with_metadata: FlowMessageWithMetadata = FlowMessageWithMetadata {
+                                flow_message: deserialized_msg,
+                                timestamp: Utc::now(),
+                                host: "host".into(),
+                                malicious: None,
+                            };
+
+                            debug!("Deserialized kafka event: {:?}", msg_with_metadata.flow_message);
+                            tx.send(msg_with_metadata).unwrap()
                         }
                         Some(Err(e)) => {
                             error!("Unable to decode kafka even into flow message: {:?}", e);
@@ -108,7 +114,7 @@ impl Transport for KafkaState {
         }
     }
 
-    async fn consume(&self, tx: tokio::sync::mpsc::Sender<FlowMessage>) {
+    async fn consume(&self, tx: tokio::sync::broadcast::Sender<FlowMessage>) {
         info!("Starting to consume messages from kafka...");
         let _buf = BytesMut::with_capacity(4096);
         loop {
@@ -146,7 +152,7 @@ impl Transport for KafkaState {
             };
             //
             // handling channel sending error
-            if let Err(e) = tx.send(decoded_msg).await {
+            if let Err(e) = tx.send(decoded_msg) {
                 error!("Unable to put kafka event on channel: {}", e)
             }
         }
