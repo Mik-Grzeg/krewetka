@@ -11,7 +11,7 @@ use super::{
     import::{Import, Subscriber},
 };
 
-use crate::flow::FlowMessage;
+use crate::pb::FlowMessage;
 
 #[derive(Debug)]
 pub struct ZMQSettings {
@@ -100,7 +100,7 @@ impl Import for ZMQ {
 mod tests {
 
     use super::*;
-    use crate::flow::FlowMessage;
+    use crate::pb::FlowMessage;
     use mockall::mock;
     use pretty_assertions::assert_eq;
     use serde_json::error::Category;
@@ -134,7 +134,7 @@ mod tests {
         de_error_category: Option<serde_json::error::Category>,
     ) {
         let prepared_msg = format!(
-            r#"{{"OUT_BYTES":{},"OUT_PKTS":{},"L4_DST_PORT":{},"IPV4_DST_ADDR":"{}","IPV4_SRC_ADDR":"{}","PROTOCOL":{},"L4_SRC_PORT":{},"IN_BYTES":{},"IN_PKTS":{},"L7_PROTO":"{}","TCP_FLAGS":{},"FLOW_DURATION_MILLISECONDS":{}}}"#,
+            r#"{{"OUT_BYTES":{},"OUT_PKTS":{},"L4_DST_PORT":{},"IPV4_DST_ADDR":"{}","IPV4_SRC_ADDR":"{}","PROTOCOL":{},"L4_SRC_PORT":{},"IN_BYTES":{},"IN_PKTS":{},"L7_PROTO":{},"TCP_FLAGS":{},"FLOW_DURATION_MILLISECONDS":{}}}"#,
             out_bytes,
             out_pkts,
             l4_dst_port,
@@ -172,6 +172,7 @@ mod tests {
             l7_proto,
             protocol,
             l4_dst_port,
+            l4_src_port,
             ipv4_dst_addr,
             ipv4_src_addr,
             tcp_flags,
