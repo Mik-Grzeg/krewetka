@@ -7,5 +7,5 @@ pub mod storage;
 pub mod transport;
 
 pub mod pb {
-    tonic::include_proto!("flow");
+    include!("flow.rs");
 }

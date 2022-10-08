@@ -20,19 +20,21 @@ pub struct FlowMessage {
     #[prost(string, tag="6")]
     pub ipv4_dst_addr: ::prost::alloc::string::String,
     /// Layer 7 protocol
-    #[prost(string, tag="7")]
-    pub l7_proto: ::prost::alloc::string::String,
+    #[prost(float, tag="7")]
+    pub l7_proto: f32,
     /// Layer 4 port
     #[prost(uint32, tag="8")]
     pub l4_dst_port: u32,
+    #[prost(uint32, tag="9")]
+    pub l4_src_port: u32,
     /// Duration
-    #[prost(uint64, tag="9")]
+    #[prost(uint64, tag="10")]
     pub flow_duration_milliseconds: u64,
     /// Protocol
-    #[prost(uint32, tag="10")]
+    #[prost(uint32, tag="11")]
     pub protocol: u32,
     /// TCP flags
-    #[prost(uint32, tag="11")]
+    #[prost(uint32, tag="12")]
     pub tcp_flags: u32,
 }
 /// Generated client implementations.

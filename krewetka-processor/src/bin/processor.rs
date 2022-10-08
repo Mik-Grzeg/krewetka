@@ -2,7 +2,7 @@ use lib::application_state::ApplicationState;
 use log::info;
 
 pub mod pb {
-    tonic::include_proto!("flow");
+    include!("../flow.rs");
 }
 
 #[tokio::main]
@@ -12,11 +12,6 @@ async fn main() {
     env_logger::init_from_env(env);
 
     info!("Starting application");
-
-    // TODO change to proper client initialization
-
-    // println!("classification");
-    // streaming_classifier(&mut client, 10).await;
 
     let state = match ApplicationState::new().await {
         Ok(s) => s,
