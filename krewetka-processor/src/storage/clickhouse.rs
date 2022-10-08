@@ -1,12 +1,11 @@
 use super::astorage::{AStorage, StorageError};
-use clickhouse_rs::{Pool, row, types::Block};
-use serde::Deserialize;
+use clickhouse_rs::{row, types::Block, Pool};
 use log::info;
+use serde::Deserialize;
 
+use crate::transport::FlowMessageWithMetadata;
 use async_trait::async_trait;
 use std::sync::Arc;
-use crate::{pb::FlowMessage, transport::FlowMessageWithMetadata};
-
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct ClickhouseSettings {
@@ -59,22 +58,22 @@ impl AStorage for ClickhouseState {
 
         let mut block = Block::with_capacity(msgs.len());
         for f in msgs {
-            block.push(row! { 
-                host: f.host.as_str(),
-                out_bytes: f.flow_message.out_bytes,
-                out_pkts:   f.flow_message.out_pkts,
-                in_bytes:   f.flow_message.in_bytes,
-                in_pkts:    f.flow_message.in_pkts,
-                ipv4_src_addr: f.flow_message.ipv4_src_addr.as_str(),
-                ipv4_dst_addr: f.flow_message.ipv4_dst_addr.as_str(),
-                l7_proto:       f.flow_message.l7_proto,
-                l4_dst_port:    f.flow_message.l4_dst_port,
-                l4_src_port:    f.flow_message.l4_src_port,
-                flow_duration_milliseconds: f.flow_message.flow_duration_milliseconds,
-                protocol:       f.flow_message.protocol,
-                tcp_flags:      f.flow_message.tcp_flags,
-                timestamp:      f.timestamp
-             })?;
+            block.push(row! {
+               host: f.host.as_str(),
+               out_bytes: f.flow_message.out_bytes,
+               out_pkts:   f.flow_message.out_pkts,
+               in_bytes:   f.flow_message.in_bytes,
+               in_pkts:    f.flow_message.in_pkts,
+               ipv4_src_addr: f.flow_message.ipv4_src_addr.as_str(),
+               ipv4_dst_addr: f.flow_message.ipv4_dst_addr.as_str(),
+               l7_proto:       f.flow_message.l7_proto,
+               l4_dst_port:    f.flow_message.l4_dst_port,
+               l4_src_port:    f.flow_message.l4_src_port,
+               flow_duration_milliseconds: f.flow_message.flow_duration_milliseconds,
+               protocol:       f.flow_message.protocol,
+               tcp_flags:      f.flow_message.tcp_flags,
+               timestamp:      f.timestamp
+            })?;
         }
 
         info!("Saving to clickhouse {} messages", msgs.len());

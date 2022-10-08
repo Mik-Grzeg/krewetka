@@ -1,21 +1,21 @@
 use crate::classification_client::{streaming_classifier, Classifier};
 use crate::consts::DEFAULT_ENV_VAR_PREFIX;
+use crate::pb::flow_message_classifier_client::FlowMessageClassifierClient;
 use crate::settings::ProcessorSettings;
 use crate::storage::astorage::AStorage;
 use crate::storage::{astorage::StorageError, clickhouse::ClickhouseState};
-use crate::pb::flow_message_classifier_client::FlowMessageClassifierClient;
 use crate::transport::kafka::KafkaState;
-use crate::transport::{kafka, Transport, FlowMessageWithMetadata};
+use crate::transport::{kafka, FlowMessageWithMetadata, Transport};
 use config::builder::DefaultState;
 use config::{Config, ConfigBuilder, Environment};
 use log::error;
-use tonic::transport::Channel;
-use std::sync::{Arc, Mutex};
+
+use log::debug;
 use serde::Deserialize;
-use tokio::sync::{mpsc, broadcast};
+use std::sync::Arc;
+use tokio::sync::{broadcast, mpsc};
 use tokio::task;
 use tokio::time::{interval, Duration};
-use log::{debug};
 
 // use crate::transport::WrappedFlowMessage;
 
@@ -54,7 +54,9 @@ impl ApplicationState {
             deserialized_config.kafka_brokers,
         ));
         // set clickhouse settings
-        let clickhouse_state = Arc::new(ClickhouseState::new(deserialized_config.clickhouse_settings));
+        let clickhouse_state = Arc::new(ClickhouseState::new(
+            deserialized_config.clickhouse_settings,
+        ));
 
         let classification_state = Classifier {
             port: deserialized_config.grpc_classification_port,
@@ -92,12 +94,16 @@ impl ApplicationState {
             }
         });
 
-
         let rx_1 = tx.subscribe();
         let stream_channel = tokio_stream::wrappers::BroadcastStream::from(rx_1);
 
         // create grpc ml client
-        let mut grpc_client = FlowMessageClassifierClient::connect(format!("http://{}:{}", self.classification_state.host, self.classification_state.port)).await.unwrap();
+        let mut grpc_client = FlowMessageClassifierClient::connect(format!(
+            "http://{}:{}",
+            self.classification_state.host, self.classification_state.port
+        ))
+        .await
+        .unwrap();
         let ml_pipeline = task::spawn(async move {
             streaming_classifier(&mut rx, stream_channel, tx_after_ml, &mut grpc_client).await;
         });

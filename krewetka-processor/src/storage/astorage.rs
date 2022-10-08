@@ -1,7 +1,7 @@
+use crate::transport::FlowMessageWithMetadata;
 use async_trait::async_trait;
-use std::error::Error;
-use crate::{pb::FlowMessage, transport::FlowMessageWithMetadata};
 use clickhouse_rs::errors::Error as ChError;
+use std::error::Error;
 
 #[derive(Debug)]
 pub enum StorageError {

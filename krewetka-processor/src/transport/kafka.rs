@@ -1,10 +1,10 @@
 use super::Transport;
 
 use crate::pb::FlowMessage;
+use crate::transport::FlowMessageWithMetadata;
 use async_trait::async_trait;
 use bytes::BytesMut;
-use chrono::{DateTime, Utc};
-use crate::transport::FlowMessageWithMetadata;
+use chrono::Utc;
 use log::{debug, error, info, warn};
 use prost::Message as PBMessage;
 use rdkafka::{
@@ -69,8 +69,6 @@ impl KafkaState {
     }
 }
 
-use std::sync::{Arc, Mutex};
-
 #[async_trait]
 impl Transport for KafkaState {
     async fn consume_batch(&self, tx: tokio::sync::broadcast::Sender<FlowMessageWithMetadata>) {
@@ -84,16 +82,21 @@ impl Transport for KafkaState {
                 Ok(ev) => {
                     match ev.payload_view::<[u8]>() {
                         Some(Ok(f)) => {
-                            let deserialized_msg: FlowMessage = PBMessage::decode::<&[u8]>(f).unwrap(); // TODO properly handle error
+                            let deserialized_msg: FlowMessage =
+                                PBMessage::decode::<&[u8]>(f).unwrap(); // TODO properly handle error
 
-                            let msg_with_metadata: FlowMessageWithMetadata = FlowMessageWithMetadata {
-                                flow_message: deserialized_msg,
-                                timestamp: Utc::now(),
-                                host: "host".into(),
-                                malicious: None,
-                            };
+                            let msg_with_metadata: FlowMessageWithMetadata =
+                                FlowMessageWithMetadata {
+                                    flow_message: deserialized_msg,
+                                    timestamp: Utc::now(),
+                                    host: "host".into(),
+                                    malicious: None,
+                                };
 
-                            debug!("Deserialized kafka event: {:?}", msg_with_metadata.flow_message);
+                            debug!(
+                                "Deserialized kafka event: {:?}",
+                                msg_with_metadata.flow_message
+                            );
                             tx.send(msg_with_metadata).unwrap()
                         }
                         Some(Err(e)) => {

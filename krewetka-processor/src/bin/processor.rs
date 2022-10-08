@@ -1,8 +1,6 @@
 use lib::application_state::ApplicationState;
 use log::info;
 
-
-use lib::pb::{flow_message_classifier_client::FlowMessageClassifierClient, FlowMessage, FlowMessageClass};
 pub mod pb {
     tonic::include_proto!("flow");
 }
@@ -19,7 +17,6 @@ async fn main() {
 
     // println!("classification");
     // streaming_classifier(&mut client, 10).await;
-    
 
     let state = match ApplicationState::new().await {
         Ok(s) => s,
