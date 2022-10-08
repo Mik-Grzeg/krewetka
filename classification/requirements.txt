@@ -1,0 +1,2 @@
+grpcio-tools
+scikit-learn==1.0.2
