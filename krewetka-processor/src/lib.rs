@@ -5,6 +5,6 @@ pub mod settings;
 pub mod storage;
 pub mod transport;
 
-pub mod flow {
+pub mod pb {
     tonic::include_proto!("flow");
 }

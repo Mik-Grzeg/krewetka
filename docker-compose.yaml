@@ -27,7 +27,7 @@ services:
 
   krewetka-collector:
     build:
-      context: ./krewetka-collector
+      dockerfile: ./krewetka-collector/Dockerfile
     depends_on:
       - broker
       - importer
@@ -41,7 +41,7 @@ services:
 
   krewetka-processor:
     build:
-      context: ./krewetka-processor
+      dockerfile: ./krewetka-processor/Dockerfile
       target: processor
     depends_on:
       - broker
@@ -56,7 +56,7 @@ services:
 
   krewetka-migrator:
     build:
-      context: ./krewetka-processor
+      dockerfile: ./krewetka-processor/Dockerfile
       target: migrator
     depends_on:
       - clickhouse

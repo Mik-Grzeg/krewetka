@@ -6,6 +6,8 @@ fn main() {
     let mut proto_path_ancestors = std::path::Path::new(&proto_path).ancestors();
 
     tonic_build::configure()
+        .build_server(false)
+        .build_client(false)
         .type_attribute(
             ".flow.FlowMessage",
             "#[derive(serde::Serialize, serde::Deserialize)]",

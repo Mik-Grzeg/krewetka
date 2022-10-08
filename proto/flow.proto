@@ -1,8 +1,13 @@
 syntax = "proto3";
 package flow;
 
-option java_outer_classname = "FlowMessageProto";
+service FlowMessageClassifier {
+  rpc ClassifyStreaming (stream FlowMessage) returns (stream FlowMessageClass) {}
+}
 
+message FlowMessageClass {
+  bool malicious = 1;
+}
 
 message FlowMessage {
 
@@ -22,13 +27,14 @@ message FlowMessage {
 
   // Layer 4 port
   uint32 L4DstPort = 8;
+  uint32 L4SrcPort = 9;
 
   // Duration
-  uint64 FlowDurationMilliseconds = 9;
+  uint64 FlowDurationMilliseconds = 10;
 
   // Protocol
-  uint32 Protocol = 10;
+  uint32 Protocol = 11;
 
   // TCP flags
-  uint32 TCPFlags = 11;
+  uint32 TCPFlags = 12;
 }

@@ -86,20 +86,6 @@ impl ClickhouseMigrations {
                 if applied { info!("Migration from file {} already applied", f_name) };
                 applied
             });
-            // .iter()
-            // .filter(|f| block.iter().any(|i| i == f.to_str().unwrap()))
-            // .collect::<Vec<&PathBuf>>();
-            
-        // block
-        //     .rows()
-        //     .filter_map(|r| {
-        //         let fname: String = r.get("migration_file_name").expect("missing migration_file_name in result");
-        //         let 
-        //     })
-        // for row in block.rows() {
-        //     migration_files.remo
-        // }
-
     }
 }
 
@@ -120,12 +106,13 @@ impl AbstractMigratorSql for ClickhouseMigrations {
             .unwrap()
             .recognized_files.clone();
 
+        
+        let inital_number_of_migration_files = migrations.len();
+        info!("{} migration files found", inital_number_of_migration_files);
         self.ignore_applied_migrations(&mut client, &mut migrations).await;
+        info!("{} migration has already been applied", initial_number_of_migration_files - migrations.len());
 
-        info!("{} migration files found", migrations.len());
-        for path in migrations {
-            self.apply_migration(&path, &mut client).await?;
-        }
+        for path in migrations { self.apply_migration(&path, &mut client).await?; };
 
         Ok(())
     }

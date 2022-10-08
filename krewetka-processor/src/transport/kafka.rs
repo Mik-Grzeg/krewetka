@@ -1,6 +1,6 @@
 use super::Transport;
 
-use crate::flow::FlowMessage;
+use crate::pb::FlowMessage;
 use async_trait::async_trait;
 use bytes::BytesMut;
 use log::{debug, error, info, warn};
