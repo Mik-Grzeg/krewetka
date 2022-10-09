@@ -1,22 +1,18 @@
-use crate::flow::FlowMessage;
+use crate::pb::FlowMessage;
 use async_trait::async_trait;
-
-use std::sync::{Arc, Mutex};
+use chrono::{DateTime, Utc};
 
 #[async_trait]
 pub trait Transport: Send + Sync {
-    async fn consume(&self, tx: tokio::sync::mpsc::Sender<FlowMessage>);
-    async fn consume_batch(&self, tx: tokio::sync::mpsc::Sender<WrappedFlowMessage>);
+    async fn consume(&self, tx: tokio::sync::broadcast::Sender<FlowMessage>);
+    async fn consume_batch(&self, tx: tokio::sync::broadcast::Sender<FlowMessageWithMetadata>);
 }
 
-#[derive(Clone)]
-pub struct WrappedFlowMessage(pub Arc<Mutex<FlowMessage>>);
-
-// impl FromBytes for WrappedFlowMessage {
-//     type Error = DecodeError;
-//     fn from_bytes(b: &[u8]) -> Result<&Self, Self::Error> {
-//         let res = PBMessage::decode::<&[u8]>(b)?;
-//         let res1 = Self(Arc::new(Mutex::new(res)) );
-//         Ok(&res1)
-//     }
-// }
+#[derive(Clone, Debug)]
+pub struct FlowMessageWithMetadata {
+    pub flow_message: FlowMessage,
+    pub timestamp: DateTime<Utc>,
+    pub host: String,
+    pub malicious: Option<bool>,
+    // id:             Uuid,
+}

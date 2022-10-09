@@ -2,18 +2,20 @@ FROM lukemathwalker/cargo-chef:latest-rust-1.63.0 AS chef
 WORKDIR /app
 
 FROM chef as planner
-COPY . .
+COPY krewetka-processor .
 RUN cargo chef prepare --recipe-path recipe.json
 
 ####################################################################################################
-## Cacher
+## Builder 
 ####################################################################################################
 
-FROM chef as cacher
+FROM chef as builder 
 
 # Create appuser
 ENV USER=krewetka
 ENV UID=10001
+
+COPY krewetka-processor ./
 
 RUN adduser \
     --disabled-password \
@@ -24,26 +26,14 @@ RUN adduser \
     --uid "${UID}" \
     "${USER}"
 
-RUN apt-get update && apt-get install -y libzmq3-dev cmake
+RUN apt-get update && apt-get install -y libzmq3-dev cmake protobuf-compiler libprotobuf-dev
 
 WORKDIR /app
 COPY --from=planner /app/recipe.json recipe.json
-# Build the dependencies (and add to docker's caching layer)
-# This caches the dependency files similar to how @ckaserer's solution
-# does, but is handled solely through the `cargo-chef` library.
 RUN cargo chef cook --release --recipe-path recipe.json
 
-####################################################################################################
-## Builder
-####################################################################################################
-
-FROM rust as builder
-WORKDIR /app
-
-RUN apt-get update && apt-get install -y protobuf-compiler libprotobuf-dev cmake
-
-COPY . .
-COPY --from=cacher /app/target target
+COPY krewetka-processor ./
+COPY proto ./proto
 
 RUN cargo build --release
 
@@ -53,8 +43,8 @@ RUN cargo build --release
 FROM debian:bookworm-slim as processor
 
 # Import from builder.
-COPY --from=cacher /etc/passwd /etc/passwd
-COPY --from=cacher /etc/group /etc/group
+COPY --from=builder /etc/passwd /etc/passwd
+COPY --from=builder /etc/group /etc/group
 
 WORKDIR /app
 
@@ -73,8 +63,8 @@ CMD [ "/app/processor" ]
 FROM debian:bookworm-slim as migrator 
 
 # Import from builder.
-COPY --from=cacher /etc/passwd /etc/passwd
-COPY --from=cacher /etc/group /etc/group
+COPY --from=builder /etc/passwd /etc/passwd
+COPY --from=builder /etc/group /etc/group
 
 
 WORKDIR /app

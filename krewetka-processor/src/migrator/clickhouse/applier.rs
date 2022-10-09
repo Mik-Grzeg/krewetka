@@ -9,7 +9,6 @@ use std::fs::{DirEntry, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-
 pub struct ClickhouseMigrations {
     validated_migration_scripts: Option<MigrationFiles>,
     clickhouse_state: ClickhouseState,
@@ -69,37 +68,34 @@ impl ClickhouseMigrations {
         Ok(())
     }
 
-    async fn ignore_applied_migrations(&self, client: &mut ClientHandle, migration_files: &mut Vec<PathBuf>) {
+    async fn ignore_applied_migrations(
+        &self,
+        client: &mut ClientHandle,
+        migration_files: &mut Vec<PathBuf>,
+    ) {
         let dql = r#"
             SELECT * FROM _db_migrations;
         "#;
-        let block = client.query(dql).fetch_all().await.expect("Unable to fetch applied migrations from table _db_migrations")
+        let block = client
+            .query(dql)
+            .fetch_all()
+            .await
+            .expect("Unable to fetch applied migrations from table _db_migrations")
             .rows()
-            .map(|r| -> String { r.get("migration_file_name").expect("missing migration_file_name in result")})
+            .map(|r| -> String {
+                r.get("migration_file_name")
+                    .expect("missing migration_file_name in result")
+            })
             .collect::<Vec<String>>();
 
-
-        migration_files 
-            .retain(|f| { 
-                let f_name = f.to_str().unwrap();
-                let applied = block.iter().any(|i| i == f_name);
-                if applied { info!("Migration from file {} already applied", f_name) };
-                applied
-            });
-            // .iter()
-            // .filter(|f| block.iter().any(|i| i == f.to_str().unwrap()))
-            // .collect::<Vec<&PathBuf>>();
-            
-        // block
-        //     .rows()
-        //     .filter_map(|r| {
-        //         let fname: String = r.get("migration_file_name").expect("missing migration_file_name in result");
-        //         let 
-        //     })
-        // for row in block.rows() {
-        //     migration_files.remo
-        // }
-
+        migration_files.retain(|f| {
+            let f_name = f.to_str().unwrap();
+            let applied = block.iter().any(|i| i == f_name);
+            if applied {
+                info!("Migration from file {} already applied", f_name)
+            };
+            !applied
+        });
     }
 }
 
@@ -118,11 +114,18 @@ impl AbstractMigratorSql for ClickhouseMigrations {
             .validated_migration_scripts
             .as_ref()
             .unwrap()
-            .recognized_files.clone();
+            .recognized_files
+            .clone();
 
-        self.ignore_applied_migrations(&mut client, &mut migrations).await;
+        let inital_number_of_migration_files = migrations.len();
+        info!("{} migration files found", inital_number_of_migration_files);
+        self.ignore_applied_migrations(&mut client, &mut migrations)
+            .await;
+        info!(
+            "{} migration has already been applied",
+            inital_number_of_migration_files - migrations.len()
+        );
 
-        info!("{} migration files found", migrations.len());
         for path in migrations {
             self.apply_migration(&path, &mut client).await?;
         }

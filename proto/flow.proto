@@ -1,0 +1,40 @@
+syntax = "proto3";
+package flow;
+
+service FlowMessageClassifier {
+  rpc ClassifyStreaming (stream FlowMessage) returns (stream FlowMessageClass) {}
+}
+
+message FlowMessageClass {
+  bool malicious = 1;
+}
+
+message FlowMessage {
+
+  uint64 OutBytes = 1;
+  uint64 OutPkts = 2;
+
+  // In sizes of packets
+  uint64 InBytes = 3;
+  uint64 InPkts = 4;
+
+  // Source/destination addresses
+  string IPV4SrcAddr = 5;
+  string IPV4DstAddr = 6;
+
+  // Layer 7 protocol
+  float L7Proto = 7;
+
+  // Layer 4 port
+  uint32 L4DstPort = 8;
+  uint32 L4SrcPort = 9;
+
+  // Duration
+  uint64 FlowDurationMilliseconds = 10;
+
+  // Protocol
+  uint32 Protocol = 11;
+
+  // TCP flags
+  uint32 TCPFlags = 12;
+}

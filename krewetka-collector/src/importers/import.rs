@@ -7,7 +7,7 @@ use async_trait::async_trait;
 
 use prost::Message;
 
-use crate::flow::FlowMessage;
+use crate::pb::FlowMessage;
 
 #[async_trait]
 pub trait Import: Sync + Send {

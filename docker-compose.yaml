@@ -27,7 +27,7 @@ services:
 
   krewetka-collector:
     build:
-      context: ./krewetka-collector
+      dockerfile: ./krewetka-collector/Dockerfile
     depends_on:
       - broker
       - importer
@@ -41,11 +41,13 @@ services:
 
   krewetka-processor:
     build:
-      context: ./krewetka-processor
+      dockerfile: ./krewetka-processor/Dockerfile
       target: processor
     depends_on:
       - broker
-      - importer
+      - classifier_server
+      - krewetka-collector
+      - clickhouse
     environment:
       KREWETKA__KAFKA_BROKERS: "broker:9092"
       KREWETKA__KAFKA_TOPIC: "flows"
@@ -53,10 +55,12 @@ services:
       KREWETKA__CLICKHOUSE_SETTINGS__PORT: 9000
       KREWETKA__CLICKHOUSE_SETTINGS__USER: "myuser"
       KREWETKA__CLICKHOUSE_SETTINGS__PASSWORD: "password"
+      KREWETKA__GRPC_CLASSIFICATION_PORT: 50051
+      KREWETKA__GRPC_CLASSIFICATION_HOST: classifier_server 
 
   krewetka-migrator:
     build:
-      context: ./krewetka-processor
+      dockerfile: ./krewetka-processor/Dockerfile
       target: migrator
     depends_on:
       - clickhouse
@@ -75,3 +79,7 @@ services:
     environment:
       CLICKHOUSE_USER: "myuser"
       CLICKHOUSE_PASSWORD: "password"
+
+  classifier_server:
+    build: 
+      dockerfile: ./classification/Dockerfile

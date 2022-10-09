@@ -5,6 +5,6 @@ pub mod exporters;
 pub mod importers;
 pub mod settings;
 
-pub mod flow {
-    tonic::include_proto!("flow");
+pub mod pb {
+    include!("flow.rs");
 }

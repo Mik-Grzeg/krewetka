@@ -11,7 +11,7 @@ use super::{
     import::{Import, Subscriber},
 };
 
-use crate::flow::FlowMessage;
+use crate::pb::FlowMessage;
 
 #[derive(Debug)]
 pub struct ZMQSettings {
@@ -100,7 +100,7 @@ impl Import for ZMQ {
 mod tests {
 
     use super::*;
-    use crate::flow::FlowMessage;
+    use crate::pb::FlowMessage;
     use mockall::mock;
     use pretty_assertions::assert_eq;
     use serde_json::error::Category;
@@ -116,8 +116,8 @@ mod tests {
         }
     }
 
-    #[case(77, 1, 53, "10.0.0.1".to_string(), "10.0.0.2".to_string(), 17, 56341, 61, 1, "5.126".to_string(), 0, 12, None; "ensure correct input is deserialized as it should, with no errors")]
-    #[case(77, 1, 53, "".to_string(), "".to_string(), 17, 56341, 61, 1, "".to_string(), 0, 12, Some(Category::Data); "ensure partially missing data results in error")]
+    #[case(77, 1, 53, "10.0.0.1".to_string(), "10.0.0.2".to_string(), 17, 56341, 61, 1, 0.2, 0, 12, None; "ensure correct input is deserialized as it should, with no errors")]
+    #[case(77, 1, 53, "".to_string(), "".to_string(), 17, 56341, 61, 1, 3.2, 0, 12, Some(Category::Data); "ensure partially missing data results in error")]
     fn test_import_zmq(
         out_bytes: u64,
         out_pkts: u64,
@@ -128,13 +128,13 @@ mod tests {
         l4_src_port: u32,
         in_bytes: u64,
         in_pkts: u64,
-        l7_proto: String,
+        l7_proto: f32,
         tcp_flags: u32,
         flow_duration_milliseconds: u64,
         de_error_category: Option<serde_json::error::Category>,
     ) {
         let prepared_msg = format!(
-            r#"{{"OUT_BYTES":{},"OUT_PKTS":{},"L4_DST_PORT":{},"IPV4_DST_ADDR":"{}","IPV4_SRC_ADDR":"{}","PROTOCOL":{},"L4_SRC_PORT":{},"IN_BYTES":{},"IN_PKTS":{},"L7_PROTO":"{}","TCP_FLAGS":{},"FLOW_DURATION_MILLISECONDS":{}}}"#,
+            r#"{{"OUT_BYTES":{},"OUT_PKTS":{},"L4_DST_PORT":{},"IPV4_DST_ADDR":"{}","IPV4_SRC_ADDR":"{}","PROTOCOL":{},"L4_SRC_PORT":{},"IN_BYTES":{},"IN_PKTS":{},"L7_PROTO":{},"TCP_FLAGS":{},"FLOW_DURATION_MILLISECONDS":{}}}"#,
             out_bytes,
             out_pkts,
             l4_dst_port,
@@ -172,6 +172,7 @@ mod tests {
             l7_proto,
             protocol,
             l4_dst_port,
+            l4_src_port,
             ipv4_dst_addr,
             ipv4_src_addr,
             tcp_flags,
