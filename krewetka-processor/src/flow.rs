@@ -1,4 +1,14 @@
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FlowMessageClassBatched {
+    #[prost(message, repeated, tag="1")]
+    pub classifications: ::prost::alloc::vec::Vec<FlowMessageClass>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FlowMessageBatched {
+    #[prost(message, repeated, tag="1")]
+    pub messages: ::prost::alloc::vec::Vec<FlowMessage>,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FlowMessageClass {
     #[prost(bool, tag="1")]
     pub malicious: bool,
@@ -127,6 +137,44 @@ pub mod flow_message_classifier_client {
                 "/flow.FlowMessageClassifier/ClassifyStreaming",
             );
             self.inner.streaming(request.into_streaming_request(), path, codec).await
+        }
+        pub async fn classify_batch(
+            &mut self,
+            request: impl tonic::IntoRequest<super::FlowMessageBatched>,
+        ) -> Result<tonic::Response<super::FlowMessageClassBatched>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/flow.FlowMessageClassifier/ClassifyBatch",
+            );
+            self.inner.unary(request.into_request(), path, codec).await
+        }
+        pub async fn classify(
+            &mut self,
+            request: impl tonic::IntoRequest<super::FlowMessage>,
+        ) -> Result<tonic::Response<super::FlowMessageClass>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/flow.FlowMessageClassifier/Classify",
+            );
+            self.inner.unary(request.into_request(), path, codec).await
         }
     }
 }

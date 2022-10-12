@@ -1,4 +1,4 @@
-use crate::storage::clickhouse::ClickhouseSettings;
+use crate::actors::storage::clickhouse::ClickhouseSettings;
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]

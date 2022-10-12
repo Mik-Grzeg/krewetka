@@ -3,7 +3,7 @@ use clickhouse_rs::{row, types::Block, Pool};
 use log::info;
 use serde::Deserialize;
 
-use crate::transport::FlowMessageWithMetadata;
+use crate::actors::event_reader::FlowMessageWithMetadata;
 use async_trait::async_trait;
 use std::sync::Arc;
 

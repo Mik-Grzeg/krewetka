@@ -27,6 +27,7 @@ clap = { version = "4.0.0-rc.2", features = ["derive"] }
 chrono = "0.4.22"
 futures = "0.3.24"
 async-stream = "0.3.3"
+actix = "0.13.0"
 
 [build-dependencies]
 tonic-build = "0.8.2"

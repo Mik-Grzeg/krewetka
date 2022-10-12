@@ -1,4 +1,6 @@
-use crate::transport::FlowMessageWithMetadata;
+use crate::actors::event_reader::FlowMessageWithMetadata;
+use actix::Actor;
+use actix::Context;
 use async_trait::async_trait;
 use clickhouse_rs::errors::Error as ChError;
 use std::error::Error;
@@ -17,4 +19,10 @@ impl From<ChError> for StorageError {
 #[async_trait]
 pub trait AStorage {
     async fn stash(&self, msgs: &Vec<FlowMessageWithMetadata>) -> Result<(), StorageError>;
+}
+
+pub struct StorageActor {}
+
+impl Actor for StorageActor {
+    type Context = Context<Self>;
 }

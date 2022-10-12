@@ -1,12 +1,56 @@
+use std::error::Error;
+
 use crate::{
     pb::{flow_message_classifier_client::FlowMessageClassifierClient, FlowMessage},
-    transport::FlowMessageWithMetadata,
+    actors::event_reader::FlowMessageWithMetadata,
 };
 use tonic::transport::Channel;
-// use futures::stream::Stream;
 use tokio_stream::{Stream, StreamExt};
+use actix::{Actor, ResponseActFuture};
+use actix::Context;
+use actix::Addr;
+use actix::Handler;
+use actix::fut::future::WrapFuture as _;
+use crate::actors::messages::{MessageToClassify, ProcessedFinished};
+use crate::actors::storage::astorage::StorageActor;
 
-use log::info;
+use log::{info, debug};
+
+
+pub struct ClassificationActor {
+    pub client: FlowMessageClassifierClient<Channel>,
+    pub next: Addr<StorageActor>,
+}
+
+impl Actor for ClassificationActor {
+    type Context = Context<Self>;
+    
+    fn started(&mut self, ctx: &mut Self::Context) {
+        info!("Started  classification actor")
+    }
+}
+
+impl Handler<MessageToClassify> for ClassificationActor {
+    type Result = ResponseActFuture<Self, Result<(), tonic::Code>>;
+
+    fn handle(&mut self, msg: MessageToClassify, ctx: &mut Self::Context) -> Self::Result {
+        let mut client = self.client.clone(); 
+
+        Box::pin( async move {
+            match client.classify(msg.msg.flow_message).await {
+                Ok(b) => {
+                    debug!("Classify response: {:?}", b);
+                    // msg.msg.malicious = Some(b.get_ref().malicious);
+                    return Ok(())
+                },
+                Err(e) => {
+                    debug!("Classify response: {:?}", e);
+                    return Err(e.code())
+                }
+            }
+        }.into_actor(self))
+    }
+}
 
 pub struct Classifier {
     pub host: String,
@@ -29,6 +73,8 @@ pub fn classifier_requests_iter() -> impl Stream<Item = FlowMessage> {
         tcp_flags: 11,
     })
 }
+
+// pub async fn batched_classifier()
 
 pub async fn streaming_classifier(
     rx: &mut tokio::sync::broadcast::Receiver<FlowMessageWithMetadata>,

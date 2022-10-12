@@ -1,11 +1,12 @@
-use crate::classification_client::{streaming_classifier, Classifier};
+use crate::actors::classification_client_grpc::client::{streaming_classifier, Classifier};
 use crate::consts::DEFAULT_ENV_VAR_PREFIX;
 use crate::pb::flow_message_classifier_client::FlowMessageClassifierClient;
 use crate::settings::ProcessorSettings;
-use crate::storage::astorage::AStorage;
-use crate::storage::{astorage::StorageError, clickhouse::ClickhouseState};
-use crate::transport::kafka::KafkaState;
-use crate::transport::{kafka, FlowMessageWithMetadata, Transport};
+use actix::Actor;
+use crate::actors::storage::astorage::AStorage;
+use crate::actors::storage::{astorage::StorageError, clickhouse::ClickhouseState};
+// use crate::transport::{kafka, FlowMessageWithMetadata, Transport};
+use crate::actors::event_reader::{kafka::{self, KafkaState}, FlowMessageWithMetadata, Transport};
 use config::builder::DefaultState;
 use config::{Config, ConfigBuilder, Environment};
 use log::error;
@@ -16,6 +17,7 @@ use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc};
 use tokio::task;
 use tokio::time::{interval, Duration};
+use crate::actors::{event_reader, storage, classification_client_grpc};
 
 // use crate::transport::WrappedFlowMessage;
 
@@ -71,9 +73,8 @@ impl ApplicationState {
         })
     }
 
-    pub async fn init(&self) {
-        let (tx, mut rx) = broadcast::channel::<FlowMessageWithMetadata>(100);
-        let (tx_after_ml, mut rx_after_ml) = mpsc::channel::<FlowMessageWithMetadata>(100);
+    pub async fn init_actors(&self) {
+        // Clickhouse health check
         let mut ping_interval = interval(Duration::from_secs(15));
 
         let mut client = self
@@ -94,37 +95,80 @@ impl ApplicationState {
             }
         });
 
-        let rx_1 = tx.subscribe();
-        let stream_channel = tokio_stream::wrappers::BroadcastStream::from(rx_1);
+        // init storage actor
+        let stg_actor_addr = storage::astorage::StorageActor{}.start();
 
-        // create grpc ml client
-        let mut grpc_client = FlowMessageClassifierClient::connect(format!(
-            "http://{}:{}",
-            self.classification_state.host, self.classification_state.port
-        ))
-        .await
-        .unwrap();
-        let ml_pipeline = task::spawn(async move {
-            streaming_classifier(&mut rx, stream_channel, tx_after_ml, &mut grpc_client).await;
-        });
+        // init classification actor
+        let class_actor_addr = classification_client_grpc::client::ClassificationActor {
+            client: FlowMessageClassifierClient::connect(format!("http://{}:{}", self.classification_state.host, self.classification_state.port)).await.unwrap(),
+            next: stg_actor_addr,
+        }.start();
 
-        let clickhouse_state = self.clickhouse_state.clone();
-        let mut msgs: Vec<FlowMessageWithMetadata> = Vec::with_capacity(100);
+        // init transport actor
 
-        let processing = task::spawn(async move {
-            while let Some(m) = rx_after_ml.recv().await {
-                debug!("Fetched: {:#?}", m);
-                msgs.push(m);
+        let event_rdr = event_reader::EventStreamReaderActor {
+            channel: self.kafka_state.clone(),
+            next: class_actor_addr,
+        }.start();
 
-                if msgs.len() == 100 {
-                    clickhouse_state.stash(&msgs).await.unwrap();
-                    msgs.drain(..);
-                }
-            }
-        });
 
-        self.kafka_state.consume_batch(tx).await;
-        ml_pipeline.await;
-        processing.await;
+        self.kafka_state.consume(event_rdr).await;
     }
+
+    // pub async fn init(&self) {
+    //     let (tx, mut rx) = broadcast::channel::<FlowMessageWithMetadata>(100);
+    //     let (tx_after_ml, mut rx_after_ml) = mpsc::channel::<FlowMessageWithMetadata>(100);
+    //     let mut ping_interval = interval(Duration::from_secs(15));
+
+    //     let mut client = self
+    //         .clickhouse_state
+    //         .pool
+    //         .as_ref()
+    //         .get_handle()
+    //         .await
+    //         .map_err(|e| StorageError::Database(Box::new(e)))
+    //         .unwrap();
+
+    //     task::spawn(async move {
+    //         loop {
+    //             if let Err(e) = client.ping().await {
+    //                 error!("Ping does pong: {}", e)
+    //             };
+    //             ping_interval.tick().await;
+    //         }
+    //     });
+
+    //     let rx_1 = tx.subscribe();
+    //     let stream_channel = tokio_stream::wrappers::BroadcastStream::from(rx_1);
+
+    //     // create grpc ml client
+    //     let mut grpc_client = FlowMessageClassifierClient::connect(format!(
+    //         "http://{}:{}",
+    //         self.classification_state.host, self.classification_state.port
+    //     ))
+    //     .await
+    //     .unwrap();
+    //     let ml_pipeline = task::spawn(async move {
+    //         streaming_classifier(&mut rx, stream_channel, tx_after_ml, &mut grpc_client).await;
+    //     });
+
+    //     let clickhouse_state = self.clickhouse_state.clone();
+    //     let mut msgs: Vec<FlowMessageWithMetadata> = Vec::with_capacity(100);
+
+    //     let processing = task::spawn(async move {
+    //         while let Some(m) = rx_after_ml.recv().await {
+    //             debug!("Fetched: {:#?}", m);
+    //             msgs.push(m);
+
+    //             if msgs.len() == 100 {
+    //                 // clickhouse_state.stash(&msgs).await.unwrap();
+    //                 msgs.drain(..);
+    //             }
+    //         }
+    //     });
+
+    //     self.kafka_state.consume_batch(tx).await;
+    //     ml_pipeline.await;
+    //     processing.await;
+    // }
 }

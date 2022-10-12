@@ -5,7 +5,7 @@ pub mod pb {
     include!("../flow.rs");
 }
 
-#[tokio::main]
+#[actix::main]
 async fn main() {
     // Setup logger
     let env = env_logger::Env::default();
@@ -18,5 +18,5 @@ async fn main() {
         Err(e) => panic!("ApplicationState init error: {:?}", e),
     };
 
-    state.init().await;
+    state.init_actors().await;
 }

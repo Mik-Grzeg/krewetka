@@ -12,7 +12,7 @@ use crate::consts::DEFAULT_ENV_VAR_PREFIX;
 use crate::migrator::clickhouse::ClickhouseMigrations;
 use crate::migrator::migrate::AbstractMigratorSql;
 use crate::settings::MigratorSettings;
-use crate::storage::clickhouse::ClickhouseState;
+use crate::actors::storage::clickhouse::ClickhouseState;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]

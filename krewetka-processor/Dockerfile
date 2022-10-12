@@ -34,6 +34,7 @@ RUN cargo chef cook --release --recipe-path recipe.json
 
 COPY krewetka-processor ./
 COPY proto ./proto
+ARG PROTO_PATH=/app/proto
 
 RUN cargo build --release
 

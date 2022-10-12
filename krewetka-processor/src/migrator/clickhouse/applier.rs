@@ -1,6 +1,6 @@
 use crate::migrator::creator::hasher;
 use crate::migrator::migrate::{AbstractMigratorSql, MigrationFiles, MigratorError};
-use crate::storage::clickhouse::ClickhouseState;
+use crate::actors::storage::clickhouse::ClickhouseState;
 use async_trait::async_trait;
 use clickhouse_rs::{Block, ClientHandle};
 use log::{error, info, warn};

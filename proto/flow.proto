@@ -3,6 +3,16 @@ package flow;
 
 service FlowMessageClassifier {
   rpc ClassifyStreaming (stream FlowMessage) returns (stream FlowMessageClass) {}
+  rpc ClassifyBatch (FlowMessageBatched) returns (FlowMessageClassBatched) {}
+  rpc Classify (FlowMessage) returns (FlowMessageClass) {}
+}
+
+message FlowMessageClassBatched {
+  repeated FlowMessageClass classifications = 1;
+}
+
+message FlowMessageBatched {
+  repeated FlowMessage messages = 1;
 }
 
 message FlowMessageClass {
