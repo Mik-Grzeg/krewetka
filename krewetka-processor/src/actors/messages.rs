@@ -1,21 +1,19 @@
-use actix::Message;
-use std::error::Error;
 use super::event_reader::FlowMessageWithMetadata;
-use actix::MailboxError;
+
+use actix::Message;
+
 
 pub enum ProcessedFinished {
     Ack,
-    Nack
+    Nack,
 }
 
 #[derive(Message)]
-#[rtype(result = "Result<(), tonic::Code>")]
-pub struct MessageToClassify {
-    pub msg: FlowMessageWithMetadata
-}
+#[rtype(result = "()")]
+pub struct MessageInPipeline(pub FlowMessageWithMetadata);
 
 #[derive(Message)]
-#[rtype(result = "Result<(), MailboxError>")]
+#[rtype(result = "Result<(), ()>")]
 pub struct MessageFromEventStream {
-    pub msg: FlowMessageWithMetadata
+    pub msg: FlowMessageWithMetadata,
 }

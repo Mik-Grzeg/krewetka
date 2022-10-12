@@ -7,12 +7,12 @@ use super::creator::create_migration_blank_file;
 use config::builder::DefaultState;
 use config::{ConfigBuilder, Environment};
 
+use crate::actors::storage::clickhouse::ClickhouseState;
 use crate::application_state::get_config;
 use crate::consts::DEFAULT_ENV_VAR_PREFIX;
 use crate::migrator::clickhouse::ClickhouseMigrations;
 use crate::migrator::migrate::AbstractMigratorSql;
 use crate::settings::MigratorSettings;
-use crate::actors::storage::clickhouse::ClickhouseState;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]

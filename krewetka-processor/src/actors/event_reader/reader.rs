@@ -1,23 +1,23 @@
+use crate::actors::messages::MessageInPipeline;
+
 use crate::pb::FlowMessage;
-use actix::MailboxError;
-use actix::WrapFuture;
+
 use actix::ResponseFuture;
-use actix::{Actor, Context, Handler, Message, ResponseActFuture, StreamHandler, Addr};
+
+use actix::{Actor, Addr, Context, Handler};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use futures::stream::Stream;
-use rdkafka::message::OwnedMessage;
-use std::sync::Mutex;
-use std::sync::Arc;
-use std::error::Error;
-use log::{info, debug, error};
-use std::pin::Pin;
-use crate::consts::ACTORS_MAILBOX_CAPACITY;
-use super::super::messages::MessageToClassify;
 
-use super::kafka::KafkaState;
-use super::super::messages::MessageFromEventStream;
+use log::{info};
+use rdkafka::message::OwnedMessage;
+
+
+use std::sync::Arc;
+
+
 use super::super::classification_client_grpc::client::ClassificationActor;
+use super::super::messages::MessageFromEventStream;
+use super::kafka::KafkaState;
 
 #[async_trait]
 pub trait Transport: Send + Sync {
@@ -37,36 +37,27 @@ pub struct FlowMessageWithMetadata {
 }
 
 pub struct EventStreamReaderActor {
-    pub channel: Arc::<KafkaState>,
-    pub next: Addr<ClassificationActor>
+    pub channel: Arc<KafkaState>,
+    pub next: Addr<ClassificationActor>,
 }
 
 impl Actor for EventStreamReaderActor {
     type Context = Context<Self>;
 
-    fn started(&mut self, ctx: &mut Self::Context) {
+    fn started(&mut self, _ctx: &mut Self::Context) {
         info!("Started transport actor");
     }
 }
 
-impl Handler<MessageFromEventStream> for EventStreamReaderActor
-{
-    type Result = ResponseFuture<Result<(), MailboxError>>;
+impl Handler<MessageFromEventStream> for EventStreamReaderActor {
+    type Result = ResponseFuture<Result<(), ()>>;
 
-    fn handle(&mut self, msg: MessageFromEventStream, ctx: &mut Self::Context) -> Self::Result {
-        debug!("Handling message: {:?}", msg.msg);
-
+    fn handle(&mut self, msg: MessageFromEventStream, _ctx: &mut Self::Context) -> Self::Result {
         let next = self.next.clone();
         Box::pin(async move {
-            match next.send(MessageToClassify{ msg: msg.msg }).await {
-                Ok(res) => {
-                    debug!("Ok result: {:?}", res.unwrap());
-                    Ok(())
-                }
-                Err(err) => {
-                    debug!("Err result: {}", err);
-                    Err(err)
-                }
+            match next.send(MessageInPipeline(msg.msg)).await {
+                Err(_e) => Err(()),
+                Ok(r) => Ok(r),
             }
         })
     }

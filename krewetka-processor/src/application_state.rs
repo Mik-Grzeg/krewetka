@@ -1,23 +1,26 @@
-use crate::actors::classification_client_grpc::client::{streaming_classifier, Classifier};
-use crate::consts::DEFAULT_ENV_VAR_PREFIX;
+use crate::actors::classification_client_grpc::client::{Classifier};
+use crate::actors::storage::astorage::AStorage;
+use crate::actors::storage::{astorage::StorageError, clickhouse::ClickhouseState};
+use crate::consts::{DEFAULT_ENV_VAR_PREFIX, STORAGE_BUFFER_SIZE};
 use crate::pb::flow_message_classifier_client::FlowMessageClassifierClient;
 use crate::settings::ProcessorSettings;
 use actix::Actor;
-use crate::actors::storage::astorage::AStorage;
-use crate::actors::storage::{astorage::StorageError, clickhouse::ClickhouseState};
 // use crate::transport::{kafka, FlowMessageWithMetadata, Transport};
-use crate::actors::event_reader::{kafka::{self, KafkaState}, FlowMessageWithMetadata, Transport};
+use crate::actors::event_reader::{
+    kafka::{self, KafkaState},
+    FlowMessageWithMetadata, Transport,
+};
 use config::builder::DefaultState;
 use config::{Config, ConfigBuilder, Environment};
 use log::error;
 
-use log::debug;
+use crate::actors::{classification_client_grpc, event_reader, storage};
+
 use serde::Deserialize;
 use std::sync::Arc;
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::{mpsc};
 use tokio::task;
 use tokio::time::{interval, Duration};
-use crate::actors::{event_reader, storage, classification_client_grpc};
 
 // use crate::transport::WrappedFlowMessage;
 
@@ -73,9 +76,18 @@ impl ApplicationState {
         })
     }
 
-    pub async fn init_actors(&self) {
+    pub async fn init_actors(mut self) {
         // Clickhouse health check
         let mut ping_interval = interval(Duration::from_secs(15));
+
+        // deserialize env config
+        let deserialized_config =
+            get_config::<ProcessorSettings>(&self.config).expect("Getting config failed");
+        let (tx, recv) = mpsc::channel::<FlowMessageWithMetadata>(STORAGE_BUFFER_SIZE);
+        let mut ch_tmp = ClickhouseState::new(deserialized_config.clickhouse_settings);
+        ch_tmp.buffer_sender = tx;
+
+        self.clickhouse_state = Arc::new(ch_tmp);
 
         let mut client = self
             .clickhouse_state
@@ -96,23 +108,35 @@ impl ApplicationState {
         });
 
         // init storage actor
-        let stg_actor_addr = storage::astorage::StorageActor{}.start();
+        let stg_actor_addr = storage::astorage::StorageActor {
+            storage: self.clickhouse_state.clone(),
+        }
+        .start();
 
         // init classification actor
         let class_actor_addr = classification_client_grpc::client::ClassificationActor {
-            client: FlowMessageClassifierClient::connect(format!("http://{}:{}", self.classification_state.host, self.classification_state.port)).await.unwrap(),
+            client: FlowMessageClassifierClient::connect(format!(
+                "http://{}:{}",
+                self.classification_state.host, self.classification_state.port
+            ))
+            .await
+            .unwrap(),
             next: stg_actor_addr,
-        }.start();
+        }
+        .start();
 
         // init transport actor
 
         let event_rdr = event_reader::EventStreamReaderActor {
             channel: self.kafka_state.clone(),
             next: class_actor_addr,
-        }.start();
+        }
+        .start();
 
+        let flusher = task::spawn(async move { self.clickhouse_state.flush_buffer(recv).await });
 
         self.kafka_state.consume(event_rdr).await;
+        flusher.await;
     }
 
     // pub async fn init(&self) {

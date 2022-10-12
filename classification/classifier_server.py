@@ -14,12 +14,22 @@ class FlowMessageClassifierServicer(flow_pb2_grpc.FlowMessageClassifierServicer)
             result = Classifier.classify(msg)
 
             if result[0] == 1:
-                result = True 
+                result = True
             else:
                 result = False
-            
+
             yield flow_pb2.FlowMessageClass(malicious = result)
- 
+
+    def Classify(self, request, context):
+        result = Classifier.classify(request)
+
+        if result[0] == 1:
+            result = True
+        else:
+            result = False
+
+        return flow_pb2.FlowMessageClass(malicious = result)
+
 
 class Classifier:
     model = pickle.load(open('flow-or-malicious.model', 'rb'))

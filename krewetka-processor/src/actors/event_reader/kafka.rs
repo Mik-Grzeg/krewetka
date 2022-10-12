@@ -1,27 +1,26 @@
-use super::{Transport, EventStreamReaderActor};
-use actix::Handler;
-use actix::{Addr, Actor};
+use super::{EventStreamReaderActor, Transport};
 
-use std::error::Error;
-use crate::pb::FlowMessage;
+use actix::{Addr};
+
+use super::super::messages::MessageFromEventStream;
 use super::FlowMessageWithMetadata;
+use crate::pb::FlowMessage;
+
 use async_trait::async_trait;
-use bytes::BytesMut;
+
 use chrono::Utc;
-use rdkafka::message::OwnedMessage;
-use tokio_stream::Stream;
-use tokio_stream::StreamExt;
-use tokio_stream::StreamMap;
 use log::{debug, error, info, warn};
 use prost::Message as PBMessage;
-use super::super::messages::MessageFromEventStream;
-use actix::Message as ActorMessage;
+use rdkafka::message::OwnedMessage;
 use rdkafka::{
     config::RDKafkaLogLevel,
-    consumer::{CommitMode, Consumer, ConsumerContext, Rebalance, StreamConsumer},
+    consumer::{Consumer, ConsumerContext, Rebalance, StreamConsumer},
     error::KafkaResult,
-    ClientConfig, ClientContext, Message, TopicPartitionList, message::BorrowedMessage,
+    ClientConfig, ClientContext, Message, TopicPartitionList,
 };
+
+
+use tokio_stream::StreamExt;
 
 
 #[derive(Debug, Clone)]
@@ -123,30 +122,32 @@ impl Transport for KafkaState {
     async fn send_to_actor(&self, msg: OwnedMessage, next: &Addr<EventStreamReaderActor>) {
         match msg.payload_view::<[u8]>() {
             Some(Ok(f)) => {
-                let deserialized_msg: FlowMessage =
-                    PBMessage::decode::<&[u8]>(f).unwrap(); // TODO properly handle error
+                let deserialized_msg: FlowMessage = PBMessage::decode::<&[u8]>(f).unwrap(); // TODO properly handle error
 
-                let msg_with_metadata: FlowMessageWithMetadata =
-                    FlowMessageWithMetadata {
-                        flow_message: deserialized_msg,
-                        timestamp: Utc::now(),
-                        host: "host".into(),
-                        malicious: None,
-                        // offset: ev.offset(),
-                    };
+                let msg_with_metadata: FlowMessageWithMetadata = FlowMessageWithMetadata {
+                    flow_message: deserialized_msg,
+                    timestamp: Utc::now(),
+                    host: "host".into(),
+                    malicious: None,
+                    // offset: ev.offset(),
+                };
 
                 debug!(
                     "Deserialized kafka event: {:?}",
                     msg_with_metadata.flow_message
                 );
-                let x = next.send(MessageFromEventStream { msg: msg_with_metadata}).await;
+                let x = next
+                    .send(MessageFromEventStream {
+                        msg: msg_with_metadata,
+                    })
+                    .await;
                 info!("send reponse: {:?}", x);
-            },
+            }
             Some(Err(e)) => {
                 error!("Unable to decode kafka even into flow message: {:?}", e);
                 panic!("Shouldn't be here no message or error")
-            },
-            _ => panic!("Shouldn't be here no message or error")
+            }
+            _ => panic!("Shouldn't be here no message or error"),
         }
     }
 
@@ -199,7 +200,7 @@ impl Transport for KafkaState {
     async fn consume(&self, next: Addr<EventStreamReaderActor>) {
         info!("Starting to consume messages from kafka...");
         let mut streamer = self.consumer.stream();
-        let mut i = 0;
+        let i = 0;
 
         while let Some(event) = streamer.next().await {
             warn!("Iteration: {}", i); // TODO remove that debugging statement
@@ -207,7 +208,7 @@ impl Transport for KafkaState {
                 Ok(ev) => {
                     let response = self.send_to_actor(ev.detach(), &next).await;
                     debug!("Actor response: {:?}", response);
-                },
+                }
                 Err(e) => {
                     error!("Unable to receive kafka event: {}", e);
                     continue;
