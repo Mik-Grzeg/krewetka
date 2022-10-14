@@ -1,15 +1,15 @@
 use super::{EventStreamReaderActor, Transport};
 
-use actix::{Addr};
+use crate::actors::messages::FlowMessageWithMetadata;
+use actix::Addr;
+use actix_broker::{Broker, SystemBroker};
 
-use super::super::messages::MessageFromEventStream;
-use super::FlowMessageWithMetadata;
 use crate::pb::FlowMessage;
 
 use async_trait::async_trait;
 
 use chrono::Utc;
-use log::{debug, error, info, warn};
+use log::{debug, error, info};
 use prost::Message as PBMessage;
 use rdkafka::message::OwnedMessage;
 use rdkafka::{
@@ -19,9 +19,7 @@ use rdkafka::{
     ClientConfig, ClientContext, Message, TopicPartitionList,
 };
 
-
 use tokio_stream::StreamExt;
-
 
 #[derive(Debug, Clone)]
 pub struct KafkaSettings {
@@ -119,7 +117,7 @@ impl KafkaState {
 
 #[async_trait]
 impl Transport for KafkaState {
-    async fn send_to_actor(&self, msg: OwnedMessage, next: &Addr<EventStreamReaderActor>) {
+    async fn send_to_actor(&self, msg: OwnedMessage, _next: &Addr<EventStreamReaderActor>) {
         match msg.payload_view::<[u8]>() {
             Some(Ok(f)) => {
                 let deserialized_msg: FlowMessage = PBMessage::decode::<&[u8]>(f).unwrap(); // TODO properly handle error
@@ -136,12 +134,7 @@ impl Transport for KafkaState {
                     "Deserialized kafka event: {:?}",
                     msg_with_metadata.flow_message
                 );
-                let x = next
-                    .send(MessageFromEventStream {
-                        msg: msg_with_metadata,
-                    })
-                    .await;
-                info!("send reponse: {:?}", x);
+                Broker::<SystemBroker>::issue_async::<FlowMessageWithMetadata>(msg_with_metadata);
             }
             Some(Err(e)) => {
                 error!("Unable to decode kafka even into flow message: {:?}", e);
@@ -155,9 +148,7 @@ impl Transport for KafkaState {
         info!("Started consuming kafka stream...");
 
         let mut streamer = self.consumer.stream();
-        let mut i = 0;
         while let Some(event) = streamer.next().await {
-            warn!("Iteration: {}", i); // TODO remove that debugging statement
             match event {
                 Ok(ev) => {
                     match ev.payload_view::<[u8]>() {
@@ -193,17 +184,14 @@ impl Transport for KafkaState {
                     continue;
                 }
             };
-            i += 1; // TODO debugging purposes
         }
     }
 
     async fn consume(&self, next: Addr<EventStreamReaderActor>) {
         info!("Starting to consume messages from kafka...");
         let mut streamer = self.consumer.stream();
-        let i = 0;
 
         while let Some(event) = streamer.next().await {
-            warn!("Iteration: {}", i); // TODO remove that debugging statement
             match event {
                 Ok(ev) => {
                     let response = self.send_to_actor(ev.detach(), &next).await;

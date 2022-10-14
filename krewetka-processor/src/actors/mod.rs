@@ -1,4 +1,7 @@
+pub mod broker;
 pub mod classification_client_grpc;
 pub mod event_reader;
-mod messages;
+pub mod messages;
 pub mod storage;
+
+type BrokerType = actix_broker::SystemBroker;

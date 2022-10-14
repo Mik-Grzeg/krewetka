@@ -1,22 +1,18 @@
-use crate::actors::messages::MessageInPipeline;
+use crate::actors::messages::ClassifyFlowMessageWithMetadata;
 
-use crate::pb::FlowMessage;
-
-use actix::ResponseFuture;
+use super::super::messages::FlowMessageWithMetadata;
 
 use actix::{Actor, Addr, Context, Handler};
+use actix_broker::{BrokerIssue, BrokerSubscribe};
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 
-use log::{info};
+use log::info;
 use rdkafka::message::OwnedMessage;
 
+use super::super::BrokerType;
 
 use std::sync::Arc;
 
-
-use super::super::classification_client_grpc::client::ClassificationActor;
-use super::super::messages::MessageFromEventStream;
 use super::kafka::KafkaState;
 
 #[async_trait]
@@ -27,38 +23,25 @@ pub trait Transport: Send + Sync {
     async fn consume_batch(&self, tx: tokio::sync::broadcast::Sender<FlowMessageWithMetadata>);
 }
 
-#[derive(Clone, Debug)]
-pub struct FlowMessageWithMetadata {
-    pub flow_message: FlowMessage,
-    pub timestamp: DateTime<Utc>,
-    pub host: String,
-    pub malicious: Option<bool>,
-    // id:             Uuid,
-}
-
 pub struct EventStreamReaderActor {
     pub channel: Arc<KafkaState>,
-    pub next: Addr<ClassificationActor>,
+    // pub broker: Arc<Mutex<Broker>>,
 }
 
 impl Actor for EventStreamReaderActor {
     type Context = Context<Self>;
 
-    fn started(&mut self, _ctx: &mut Self::Context) {
+    fn started(&mut self, ctx: &mut Self::Context) {
         info!("Started transport actor");
+        self.subscribe_async::<BrokerType, FlowMessageWithMetadata>(ctx);
     }
 }
 
-impl Handler<MessageFromEventStream> for EventStreamReaderActor {
-    type Result = ResponseFuture<Result<(), ()>>;
+impl Handler<FlowMessageWithMetadata> for EventStreamReaderActor {
+    type Result = ();
 
-    fn handle(&mut self, msg: MessageFromEventStream, _ctx: &mut Self::Context) -> Self::Result {
-        let next = self.next.clone();
-        Box::pin(async move {
-            match next.send(MessageInPipeline(msg.msg)).await {
-                Err(_e) => Err(()),
-                Ok(r) => Ok(r),
-            }
-        })
+    fn handle(&mut self, msg: FlowMessageWithMetadata, _ctx: &mut Self::Context) -> Self::Result {
+        info!("Got message: {:?}", msg);
+        self.issue_async::<BrokerType, ClassifyFlowMessageWithMetadata>(msg.into());
     }
 }

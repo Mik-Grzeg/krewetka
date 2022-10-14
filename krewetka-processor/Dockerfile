@@ -41,7 +41,7 @@ RUN cargo build --release
 ####################################################################################################
 ## Final image processor
 ####################################################################################################
-FROM debian:bookworm-slim as processor
+FROM debian:bookworm as processor
 
 # Import from builder.
 COPY --from=builder /etc/passwd /etc/passwd

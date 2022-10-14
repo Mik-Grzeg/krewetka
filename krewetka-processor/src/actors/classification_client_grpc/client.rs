@@ -1,15 +1,19 @@
+use crate::actors::broker::Broker;
 
-
-use crate::actors::storage::astorage::StorageActor;
+use crate::actors::messages::{ClassifyFlowMessageWithMetadata, PersistFlowMessageWithMetadata};
+use crate::actors::BrokerType;
 use crate::{
-    actors::{event_reader::FlowMessageWithMetadata, messages::MessageInPipeline},
+    actors::messages::FlowMessageWithMetadata,
     pb::{flow_message_classifier_client::FlowMessageClassifierClient, FlowMessage},
 };
-use actix::fut::future::WrapFuture as _;
-use actix::Addr;
+use actix::ResponseFuture;
+use std::sync::Arc;
+use std::sync::Mutex;
+
+use actix::Actor;
 use actix::Context;
 use actix::Handler;
-use actix::{Actor, ResponseActFuture};
+use actix_broker::{BrokerIssue, BrokerSubscribe};
 use tokio_stream::{Stream, StreamExt};
 use tonic::transport::Channel;
 
@@ -17,40 +21,46 @@ use log::{debug, info};
 
 pub struct ClassificationActor {
     pub client: FlowMessageClassifierClient<Channel>,
-    pub next: Addr<StorageActor>,
+    pub broker: Arc<Mutex<Broker>>,
 }
 
 impl Actor for ClassificationActor {
     type Context = Context<Self>;
 
-    fn started(&mut self, _ctx: &mut Self::Context) {
-        info!("Started  classification actor")
+    fn started(&mut self, ctx: &mut Self::Context) {
+        info!("Started  classification actor");
+        self.subscribe_async::<BrokerType, ClassifyFlowMessageWithMetadata>(ctx)
     }
 }
 
-impl Handler<MessageInPipeline> for ClassificationActor {
-    type Result = ResponseActFuture<Self, ()>;
+impl Handler<ClassifyFlowMessageWithMetadata> for ClassificationActor {
+    type Result = ResponseFuture<()>;
 
-    fn handle(&mut self, msg: MessageInPipeline, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: ClassifyFlowMessageWithMetadata,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
         let mut client = self.client.clone();
-        let next = self.next.clone();
         let mut msg = msg;
+        debug!("Classify actor received message");
+        let broker = self.broker.clone();
 
-        Box::pin(
-            async move {
-                match client.classify(msg.0.flow_message.clone()).await {
-                    Ok(b) => {
-                        debug!("Classify response: {:?}", b);
-                        msg.0.malicious = Some(b.get_ref().malicious);
-                        next.send(msg).await;
-                    }
-                    Err(e) => {
-                        debug!("Classify response: {:?}", e);
-                    }
+        Box::pin(async move {
+            match client.classify(msg.flow_message.clone()).await {
+                Ok(b) => {
+                    info!("Classify response: {:?}", b);
+                    msg.malicious = Some(b.get_ref().malicious);
+                    broker
+                        .lock()
+                        .unwrap()
+                        .issue_async::<PersistFlowMessageWithMetadata>(msg.into());
+                }
+                Err(e) => {
+                    debug!("Classify response: {:?}", e);
                 }
             }
-            .into_actor(self),
-        )
+        })
     }
 }
 

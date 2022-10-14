@@ -56,7 +56,8 @@ services:
       KREWETKA__CLICKHOUSE_SETTINGS__USER: "myuser"
       KREWETKA__CLICKHOUSE_SETTINGS__PASSWORD: "password"
       KREWETKA__GRPC_CLASSIFICATION_PORT: 50051
-      KREWETKA__GRPC_CLASSIFICATION_HOST: classifier_server 
+      KREWETKA__GRPC_CLASSIFICATION_HOST: classifier_server
+      RUST_LOG: info
 
   krewetka-migrator:
     build:

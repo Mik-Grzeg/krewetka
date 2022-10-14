@@ -6,10 +6,9 @@ use log::info;
 use serde::Deserialize;
 use tokio::sync::mpsc;
 
-use crate::actors::event_reader::FlowMessageWithMetadata;
+use crate::actors::messages::PersistFlowMessageWithMetadata;
 use async_trait::async_trait;
 use std::sync::Arc;
-
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct ClickhouseSettings {
@@ -38,7 +37,7 @@ impl std::fmt::Display for ClickhouseSettings {
 pub struct ClickhouseState {
     pub settings: ClickhouseSettings,
     pub pool: Arc<Pool>,
-    pub buffer_sender: mpsc::Sender<FlowMessageWithMetadata>,
+    pub buffer_sender: mpsc::Sender<PersistFlowMessageWithMetadata>,
 }
 
 impl ClickhouseState {
@@ -48,7 +47,7 @@ impl ClickhouseState {
         let pool = Arc::new(Pool::new(dsn));
         // let buffer = Arc::new(Mutex::new(Vec::with_capacity(STORAGE_BUFFER_SIZE)));
         let (buffer_sender, _buffer_recv) =
-            mpsc::channel::<FlowMessageWithMetadata>(STORAGE_BUFFER_SIZE);
+            mpsc::channel::<PersistFlowMessageWithMetadata>(STORAGE_BUFFER_SIZE);
         Self {
             settings,
             pool,
@@ -56,7 +55,7 @@ impl ClickhouseState {
         }
     }
 
-    async fn stash(&self, msgs: &Vec<FlowMessageWithMetadata>) -> Result<(), StorageError> {
+    async fn stash(&self, msgs: &Vec<PersistFlowMessageWithMetadata>) -> Result<(), StorageError> {
         let mut client = self
             .pool
             .as_ref()
@@ -93,12 +92,14 @@ impl ClickhouseState {
 
 #[async_trait]
 impl AStorage for ClickhouseState {
-    async fn stash_on_buffer(&self, msg: FlowMessageWithMetadata) {
+    async fn stash_on_buffer(&self, msg: PersistFlowMessageWithMetadata) {
+        info!("Sending message to stash buffer");
         self.buffer_sender.send(msg).await;
     }
 
-    async fn flush_buffer(&self, mut buffer_recv: mpsc::Receiver<FlowMessageWithMetadata>) {
-        let mut buffer: Vec<FlowMessageWithMetadata> = Vec::with_capacity(STORAGE_BUFFER_SIZE);
+    async fn flush_buffer(&self, mut buffer_recv: mpsc::Receiver<PersistFlowMessageWithMetadata>) {
+        let mut buffer: Vec<PersistFlowMessageWithMetadata> =
+            Vec::with_capacity(STORAGE_BUFFER_SIZE);
 
         while let Some(msg) = buffer_recv.recv().await {
             debug!("Got msg: {:?}", msg);

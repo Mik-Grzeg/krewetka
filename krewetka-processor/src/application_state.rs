@@ -1,4 +1,4 @@
-use crate::actors::classification_client_grpc::client::{Classifier};
+use crate::actors::classification_client_grpc::client::Classifier;
 use crate::actors::storage::astorage::AStorage;
 use crate::actors::storage::{astorage::StorageError, clickhouse::ClickhouseState};
 use crate::consts::{DEFAULT_ENV_VAR_PREFIX, STORAGE_BUFFER_SIZE};
@@ -6,19 +6,22 @@ use crate::pb::flow_message_classifier_client::FlowMessageClassifierClient;
 use crate::settings::ProcessorSettings;
 use actix::Actor;
 // use crate::transport::{kafka, FlowMessageWithMetadata, Transport};
+use crate::actors::broker::Broker;
 use crate::actors::event_reader::{
     kafka::{self, KafkaState},
-    FlowMessageWithMetadata, Transport,
+    Transport,
 };
+use crate::actors::messages::PersistFlowMessageWithMetadata;
 use config::builder::DefaultState;
 use config::{Config, ConfigBuilder, Environment};
 use log::error;
+use std::sync::Mutex;
 
 use crate::actors::{classification_client_grpc, event_reader, storage};
 
 use serde::Deserialize;
 use std::sync::Arc;
-use tokio::sync::{mpsc};
+use tokio::sync::mpsc;
 use tokio::task;
 use tokio::time::{interval, Duration};
 
@@ -83,7 +86,7 @@ impl ApplicationState {
         // deserialize env config
         let deserialized_config =
             get_config::<ProcessorSettings>(&self.config).expect("Getting config failed");
-        let (tx, recv) = mpsc::channel::<FlowMessageWithMetadata>(STORAGE_BUFFER_SIZE);
+        let (tx, recv) = mpsc::channel::<PersistFlowMessageWithMetadata>(STORAGE_BUFFER_SIZE);
         let mut ch_tmp = ClickhouseState::new(deserialized_config.clickhouse_settings);
         ch_tmp.buffer_sender = tx;
 
@@ -107,29 +110,29 @@ impl ApplicationState {
             }
         });
 
+        let actor_broker = Arc::new(Mutex::new(Broker));
+
         // init storage actor
-        let stg_actor_addr = storage::astorage::StorageActor {
+        let _stg_actor_addr = storage::astorage::StorageActor {
             storage: self.clickhouse_state.clone(),
         }
         .start();
 
         // init classification actor
-        let class_actor_addr = classification_client_grpc::client::ClassificationActor {
+        let _class_actor_addr = classification_client_grpc::client::ClassificationActor {
             client: FlowMessageClassifierClient::connect(format!(
                 "http://{}:{}",
                 self.classification_state.host, self.classification_state.port
             ))
             .await
             .unwrap(),
-            next: stg_actor_addr,
+            broker: actor_broker.clone(),
         }
         .start();
 
         // init transport actor
-
         let event_rdr = event_reader::EventStreamReaderActor {
             channel: self.kafka_state.clone(),
-            next: class_actor_addr,
         }
         .start();
 
