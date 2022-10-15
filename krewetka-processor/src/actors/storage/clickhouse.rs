@@ -1,12 +1,19 @@
 use super::astorage::{AStorage, StorageError};
+// use crate::actors::acknowleger::messages::PutOnRetryMessage;
+use super::consts::RETRY_STORAGE_INSERT_INTERVAL_IN_SECS;
+use crate::actors::acker::messages::AckMessage;
+use crate::actors::BrokerType;
 use crate::consts::STORAGE_BUFFER_SIZE;
+use actix_broker::Broker;
+use chrono::Duration;
+use clickhouse_rs::errors::Error;
 use clickhouse_rs::{row, types::Block, Pool};
 use log::debug;
 use log::info;
 use serde::Deserialize;
 use tokio::sync::mpsc;
 
-use crate::actors::messages::PersistFlowMessageWithMetadata;
+use crate::actors::messages::{FlowMessageWithMetadata, PersistFlowMessageWithMetadata};
 use async_trait::async_trait;
 use std::sync::Arc;
 
@@ -55,7 +62,10 @@ impl ClickhouseState {
         }
     }
 
-    async fn stash(&self, msgs: &Vec<PersistFlowMessageWithMetadata>) -> Result<(), StorageError> {
+    async fn stash(
+        &self,
+        msgs: &mut Vec<PersistFlowMessageWithMetadata>,
+    ) -> Result<(), StorageError> {
         let mut client = self
             .pool
             .as_ref()
@@ -64,8 +74,8 @@ impl ClickhouseState {
             .map_err(|e| StorageError::Database(Box::new(e)))?;
 
         let mut block = Block::with_capacity(msgs.len());
-        for f in msgs {
-            block.push(row! {
+        for f in msgs.into_iter() {
+            if let Err(e) = block.push(row! {
                host: f.host.as_str(),
                out_bytes: f.flow_message.out_bytes,
                out_pkts:   f.flow_message.out_pkts,
@@ -80,13 +90,33 @@ impl ClickhouseState {
                protocol:       f.flow_message.protocol,
                tcp_flags:      f.flow_message.tcp_flags,
                timestamp:      f.timestamp
-            })?;
+            }) {
+                // TODO
+                // figure out how to handle different message with the same content
+                // on top of that remove that clone
+                Broker::<BrokerType>::issue_async(AckMessage::NackRetry(
+                    FlowMessageWithMetadata::from(f.clone()),
+                ));
+            }
         }
 
         info!("Saving to clickhouse {} messages", msgs.len());
 
-        client.insert("messages", block).await?;
-        Ok(())
+        match client.insert("messages", block).await {
+            Ok(()) => {
+                msgs.drain(..)
+                    .for_each(|m| Broker::<BrokerType>::issue_async(AckMessage::Ack(m.id)));
+                Ok(())
+            }
+            Err(e) => {
+                msgs.drain(..).for_each(|m| {
+                    Broker::<BrokerType>::issue_async(AckMessage::NackRetry(
+                        FlowMessageWithMetadata::from(m),
+                    ))
+                });
+                Err(e.into())
+            }
+        }
     }
 }
 
@@ -101,21 +131,31 @@ impl AStorage for ClickhouseState {
         let mut buffer: Vec<PersistFlowMessageWithMetadata> =
             Vec::with_capacity(STORAGE_BUFFER_SIZE);
 
+        let mut last_save_failed = true;
         while let Some(msg) = buffer_recv.recv().await {
             debug!("Got msg: {:?}", msg);
             buffer.push(msg);
+
             if buffer.len() == STORAGE_BUFFER_SIZE {
-                match self.stash(&buffer).await {
-                    Ok(_) => {
-                        // TODO should pass those messages to acking actor
-                        debug!("Saved messages");
-                        buffer.clear();
-                    }
-                    Err(e) => {
+                last_save_failed = true;
+                for try_save in RETRY_STORAGE_INSERT_INTERVAL_IN_SECS {
+                    if let Err(e) = self.stash(&mut buffer).await {
                         debug!("Failed to save messages: {:?}", e);
                         // TODO should pass those messages to nacking actor
-                        buffer.clear();
+                    } else {
+                        last_save_failed = false;
+                        break;
                     }
+                }
+
+                if last_save_failed {
+                    // TODO
+                    // remove clone() in send to n/acking actor
+                    buffer.iter().for_each(|f| {
+                        Broker::<BrokerType>::issue_async(AckMessage::NackRetry(
+                            FlowMessageWithMetadata::from(f.clone()),
+                        ))
+                    });
                 }
             }
         }

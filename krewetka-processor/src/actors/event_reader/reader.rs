@@ -17,10 +17,8 @@ use super::kafka::KafkaState;
 
 #[async_trait]
 pub trait Transport: Send + Sync {
-    async fn consume(&self, next: Addr<EventStreamReaderActor>);
+    async fn consume(&self);
     // async fn send_to_actor<S: Message + Send, T: Actor + Handler<S>>(&self, msg: OwnedMessage, next: Addr<T>);
-    async fn send_to_actor(&self, msg: OwnedMessage, next: &Addr<EventStreamReaderActor>);
-    async fn consume_batch(&self, tx: tokio::sync::broadcast::Sender<FlowMessageWithMetadata>);
 }
 
 pub struct EventStreamReaderActor {

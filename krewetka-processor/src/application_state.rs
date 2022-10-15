@@ -1,4 +1,6 @@
 use crate::actors::classification_client_grpc::client::Classifier;
+use crate::actors::event_reader::kafka::OffsetGuard;
+use crate::actors::event_reader::TopicOffsetKeeper;
 use crate::actors::storage::astorage::AStorage;
 use crate::actors::storage::{astorage::StorageError, clickhouse::ClickhouseState};
 use crate::consts::{DEFAULT_ENV_VAR_PREFIX, STORAGE_BUFFER_SIZE};
@@ -138,8 +140,13 @@ impl ApplicationState {
 
         let flusher = task::spawn(async move { self.clickhouse_state.flush_buffer(recv).await });
 
-        self.kafka_state.consume(event_rdr).await;
+        let mut offset_guard = OffsetGuard::new(self.kafka_state.clone(), &self.kafka_state.topic);
+
+        let acker = task::spawn(async move { offset_guard.inc_offset().await });
+        self.kafka_state.consume().await;
+
         flusher.await;
+        acker.await;
     }
 
     // pub async fn init(&self) {

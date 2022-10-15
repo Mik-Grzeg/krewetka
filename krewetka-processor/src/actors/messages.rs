@@ -5,13 +5,9 @@ use chrono::Utc;
 use actix::Message;
 
 pub enum ProcessedFinished {
-    Ack,
-    Nack,
+    Ack(i64),
+    Nack(i64),
 }
-
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct MessageInPipeline(pub FlowMessageWithMetadata);
 
 #[derive(Message)]
 #[rtype(result = "Result<(), ()>")]
@@ -27,7 +23,7 @@ pub struct FlowMessageWithMetadata {
     pub timestamp: DateTime<Utc>,
     pub host: String,
     pub malicious: Option<bool>,
-    // id:             Uuid,
+    pub id: i64,
 }
 
 #[derive(Message)]
@@ -38,7 +34,7 @@ pub struct ClassifyFlowMessageWithMetadata {
     pub timestamp: DateTime<Utc>,
     pub host: String,
     pub malicious: Option<bool>,
-    // id:             Uuid,
+    pub id: i64,
 }
 
 #[derive(Message)]
@@ -49,7 +45,7 @@ pub struct PersistFlowMessageWithMetadata {
     pub timestamp: DateTime<Utc>,
     pub host: String,
     pub malicious: Option<bool>,
-    // id:             Uuid,
+    pub id: i64,
 }
 
 impl From<FlowMessageWithMetadata> for ClassifyFlowMessageWithMetadata {
@@ -59,6 +55,7 @@ impl From<FlowMessageWithMetadata> for ClassifyFlowMessageWithMetadata {
             timestamp: original_flow_message.timestamp,
             host: original_flow_message.host,
             malicious: original_flow_message.malicious,
+            id: original_flow_message.id,
         }
     }
 }
@@ -70,6 +67,19 @@ impl From<ClassifyFlowMessageWithMetadata> for PersistFlowMessageWithMetadata {
             timestamp: original_flow_message.timestamp,
             host: original_flow_message.host,
             malicious: original_flow_message.malicious,
+            id: original_flow_message.id,
+        }
+    }
+}
+
+impl From<PersistFlowMessageWithMetadata> for FlowMessageWithMetadata {
+    fn from(original_flow_message: PersistFlowMessageWithMetadata) -> FlowMessageWithMetadata {
+        Self {
+            flow_message: original_flow_message.flow_message,
+            timestamp: original_flow_message.timestamp,
+            host: original_flow_message.host,
+            malicious: original_flow_message.malicious,
+            id: original_flow_message.id,
         }
     }
 }

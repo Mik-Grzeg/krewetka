@@ -22,6 +22,6 @@ pub fn create_migration_blank_file(dir: &PathBuf) {
     let full_display_path = dir.display();
     match File::create(dir.clone()) {
         Ok(_) => println!("created migration file: {}", full_display_path),
-        Err(e) => eprintln!("unable to create new migration file: {}", e)
+        Err(e) => eprintln!("unable to create new migration file: {}", e),
     }
 }
