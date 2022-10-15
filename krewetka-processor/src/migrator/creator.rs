@@ -12,12 +12,16 @@ pub fn hasher<T: Hash>(t: T) -> u64 {
     hasher.finish()
 }
 
-pub fn create_migration_blank_file(dir: &PathBuf) -> Result<File> {
+pub fn create_migration_blank_file(dir: &PathBuf) {
     let mut dir = dir.clone();
     let ext = "sql";
     let t_time = Local::now().format("%s");
     let time = format!("{}.{}", t_time, ext);
-
     dir.push(time);
-    File::create(dir)
+
+    let full_display_path = dir.display();
+    match File::create(dir.clone()) {
+        Ok(_) => println!("created migration file: {}", full_display_path),
+        Err(e) => eprintln!("unable to create new migration file: {}", e)
+    }
 }
