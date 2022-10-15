@@ -25,7 +25,7 @@ services:
     build: ./dummy-importer
 
 
-  krewetka-collector:
+  collector:
     build:
       dockerfile: ./krewetka-collector/Dockerfile
     depends_on:
@@ -39,7 +39,7 @@ services:
       KREWETKA__EXPORTER__SETTINGS__KAFKA_BROKERS: "broker:9092"
       KREWETKA__EXPORTER__SETTINGS__KAFKA_TOPIC: "flows"
 
-  krewetka-processor:
+  processor:
     build:
       dockerfile: ./krewetka-processor/Dockerfile
       target: processor
@@ -59,7 +59,7 @@ services:
       KREWETKA__GRPC_CLASSIFICATION_HOST: classifier_server
       RUST_LOG: info
 
-  krewetka-migrator:
+  migrator:
     build:
       dockerfile: ./krewetka-processor/Dockerfile
       target: migrator
@@ -82,5 +82,5 @@ services:
       CLICKHOUSE_PASSWORD: "password"
 
   classifier_server:
-    build: 
+    build:
       dockerfile: ./classification/Dockerfile

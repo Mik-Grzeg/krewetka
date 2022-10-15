@@ -55,7 +55,7 @@ RUN apt-get update && apt-get install -yy curl
 WORKDIR /app
 
 # Copy our build
-COPY --from=builder /app/target/release/krewetka-collector ./collector
+COPY --from=builder /app/target/release/collector ./collector
 
 # Use an unprivileged user.
 USER krewetka:krewetka

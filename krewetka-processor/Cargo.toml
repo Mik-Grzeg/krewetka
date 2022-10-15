@@ -38,9 +38,9 @@ name = "lib"
 path = "src/lib.rs"
 
 [[bin]]
-name = "krewetka-processor"
+name = "processor"
 path = "src/bin/processor.rs"
 
 [[bin]]
-name = "krewetka-migrator"
+name = "migrator"
 path = "src/bin/migrator.rs"

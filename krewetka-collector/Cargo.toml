@@ -40,7 +40,7 @@ name = "lib"
 path = "src/lib.rs"
 
 [[bin]]
-name = "krewetka-collector"
+name = "collector"
 path = "src/main.rs"
 
 #[[bench]]
