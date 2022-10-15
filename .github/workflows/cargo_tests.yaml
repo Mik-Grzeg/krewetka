@@ -1,0 +1,60 @@
+name: cargo_tests
+
+on:
+  workflow_call:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 2
+      fail-fast: false
+      matrix:
+        app: ["krewetka-collector", "krewetka-processor"]
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1
+
+      - name: Cargo cache
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo
+          key: ${{ runner.os }}-cargo-${{ hashFiles(format('./{0}/Cargo.toml', matrix.app))}}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ hashFiles(format('./{0}/Cargo.toml', matrix.app))}}
+            ${{ runner.os }}-cargo
+
+      - name: Target cache
+        uses: actions/cache@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles(format('./{0}/Cargo.toml', matrix.app))}}
+          restore-keys: |
+            ${{ runner.os }}-cargo-target-${{ hashFiles(format('./{0}/Cargo.toml', matrix.app))}}
+            ${{ runner.os }}-cargo-target
+
+      - name: Check
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --manifest-path ./${{ matrix.app }}/Cargo.toml
+
+      - name: Test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --verbose --manifest-path ./${{ matrix.app }}/Cargo.toml
+
+      - name: Clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --manifest-path ./${{ matrix.app }}/Cargo.toml
+
+      - name: Fmt
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all --manifest-path ./${{ matrix.app }}/Cargo.toml -- --check

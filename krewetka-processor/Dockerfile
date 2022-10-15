@@ -6,10 +6,10 @@ COPY krewetka-processor .
 RUN cargo chef prepare --recipe-path recipe.json
 
 ####################################################################################################
-## Builder 
+## Builder
 ####################################################################################################
 
-FROM chef as builder 
+FROM chef as builder
 
 # Create appuser
 ENV USER=krewetka
@@ -50,7 +50,7 @@ COPY --from=builder /etc/group /etc/group
 WORKDIR /app
 
 # Copy our build
-COPY --from=builder /app/target/release/krewetka-processor ./processor
+COPY --from=builder /app/target/release/processor ./processor
 
 # Use an unprivileged user.
 USER krewetka:krewetka
@@ -59,9 +59,9 @@ ENV RUST_LOG="debug"
 CMD [ "/app/processor" ]
 
 ####################################################################################################
-## Final image migrator 
+## Final image migrator
 ####################################################################################################
-FROM debian:bookworm-slim as migrator 
+FROM debian:bookworm-slim as migrator
 
 # Import from builder.
 COPY --from=builder /etc/passwd /etc/passwd
@@ -73,7 +73,7 @@ WORKDIR /app
 COPY --from=builder /app/src/migrator/clickhouse/migrations/ ./migrations
 
 # Copy our build
-COPY --from=builder /app/target/release/krewetka-migrator ./migrator
+COPY --from=builder /app/target/release/migrator ./migrator
 
 # Use an unprivileged user.
 USER krewetka:krewetka
