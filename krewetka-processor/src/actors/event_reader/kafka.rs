@@ -1,9 +1,9 @@
-use super::{EventStreamReaderActor, Transport};
+use super::{Transport};
 
 use super::consts::OFFSET_COMMIT_INTERVAL;
 use crate::actors::event_reader::topic::TopicOffsetKeeper;
 use crate::actors::messages::FlowMessageWithMetadata;
-use actix::Addr;
+
 use actix_broker::{Broker, SystemBroker};
 use log::warn;
 use rdkafka::error::KafkaError;
@@ -13,7 +13,7 @@ use tokio::time::{sleep, Duration};
 use crate::actors::acker::Acknowleger;
 use crate::pb::FlowMessage;
 use std::collections::BinaryHeap;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc};
 
 use async_trait::async_trait;
 
@@ -197,7 +197,7 @@ impl TopicOffsetKeeper for OffsetGuard {
                 if smallest_processed_offset * -1 - self.last_stored_offest == 1 {
                     match self.store_offset(smallest_processed_offset * -1) {
                         Ok(()) => self.last_stored_offest = inner_heap.pop().unwrap() * -1,
-                        Err(err) => {
+                        Err(_err) => {
                             warn!("Couldn't store offset for topic: {}", self.state.topic);
                             continue;
                         }
@@ -210,7 +210,7 @@ impl TopicOffsetKeeper for OffsetGuard {
 
 #[async_trait]
 impl Acknowleger for OffsetGuard {
-    async fn end_processing(&self, id: i64) {
+    async fn end_processing(&self, _id: i64) {
         todo!()
     }
 }

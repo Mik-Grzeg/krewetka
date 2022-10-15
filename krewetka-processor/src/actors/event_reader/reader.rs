@@ -2,12 +2,12 @@ use crate::actors::messages::ClassifyFlowMessageWithMetadata;
 
 use super::super::messages::FlowMessageWithMetadata;
 
-use actix::{Actor, Addr, Context, Handler};
+use actix::{Actor, Context, Handler};
 use actix_broker::{BrokerIssue, BrokerSubscribe};
 use async_trait::async_trait;
 
 use log::info;
-use rdkafka::message::OwnedMessage;
+
 
 use super::super::BrokerType;
 

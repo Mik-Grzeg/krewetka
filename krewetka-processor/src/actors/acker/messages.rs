@@ -1,8 +1,7 @@
 use crate::{
     actors::messages::{
-        FlowMessageWithMetadata, PersistFlowMessageWithMetadata, ProcessedFinished,
+        FlowMessageWithMetadata,
     },
-    pb::FlowMessage,
 };
 use actix::Message;
 

@@ -7,7 +7,7 @@ use actix::Context;
 use actix::Handler;
 use actix::ResponseFuture;
 use actix_broker::BrokerSubscribe;
-use actix_broker::SystemBroker;
+
 use async_trait::async_trait;
 use log::debug;
 use log::info;
@@ -42,7 +42,7 @@ where
 {
     type Result = ResponseFuture<()>;
 
-    fn handle(&mut self, msg: AckMessage, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: AckMessage, _ctx: &mut Self::Context) -> Self::Result {
         let acker = self.acker.clone();
 
         Box::pin(async move {

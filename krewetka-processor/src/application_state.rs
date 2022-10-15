@@ -133,7 +133,7 @@ impl ApplicationState {
         .start();
 
         // init transport actor
-        let event_rdr = event_reader::EventStreamReaderActor {
+        let _event_rdr = event_reader::EventStreamReaderActor {
             channel: self.kafka_state.clone(),
         }
         .start();

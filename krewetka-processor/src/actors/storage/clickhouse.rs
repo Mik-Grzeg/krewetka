@@ -5,8 +5,8 @@ use crate::actors::acker::messages::AckMessage;
 use crate::actors::BrokerType;
 use crate::consts::STORAGE_BUFFER_SIZE;
 use actix_broker::Broker;
-use chrono::Duration;
-use clickhouse_rs::errors::Error;
+
+
 use clickhouse_rs::{row, types::Block, Pool};
 use log::debug;
 use log::info;
@@ -75,7 +75,7 @@ impl ClickhouseState {
 
         let mut block = Block::with_capacity(msgs.len());
         for f in msgs.into_iter() {
-            if let Err(e) = block.push(row! {
+            if let Err(_e) = block.push(row! {
                host: f.host.as_str(),
                out_bytes: f.flow_message.out_bytes,
                out_pkts:   f.flow_message.out_pkts,
@@ -138,7 +138,7 @@ impl AStorage for ClickhouseState {
 
             if buffer.len() == STORAGE_BUFFER_SIZE {
                 last_save_failed = true;
-                for try_save in RETRY_STORAGE_INSERT_INTERVAL_IN_SECS {
+                for _try_save in RETRY_STORAGE_INSERT_INTERVAL_IN_SECS {
                     if let Err(e) = self.stash(&mut buffer).await {
                         debug!("Failed to save messages: {:?}", e);
                         // TODO should pass those messages to nacking actor
