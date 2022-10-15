@@ -5,12 +5,12 @@ on:
     branches: ["**"]
 
 jobs:
-  # cargo_tests:
-  #   uses: ./.github/workflows/cargo_tests.yaml
+  cargo_tests:
+    uses: ./.github/workflows/cargo_tests.yaml
 
-  # docker_build:
-  #   uses: ./.github/workflows/docker_build.yaml
+  docker_build:
+    uses: ./.github/workflows/docker_build.yaml
 
   arm_binary_collector_build:
-    # needs: [cargo_tests]
+    needs: [cargo_tests]
     uses: ./.github/workflows/build_collector_binary.yaml
