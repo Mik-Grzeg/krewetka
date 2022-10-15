@@ -1,4 +1,4 @@
-use super::{Transport};
+use super::Transport;
 
 use super::consts::OFFSET_COMMIT_INTERVAL;
 use crate::actors::event_reader::topic::TopicOffsetKeeper;
@@ -13,7 +13,7 @@ use tokio::time::{sleep, Duration};
 use crate::actors::acker::Acknowleger;
 use crate::pb::FlowMessage;
 use std::collections::BinaryHeap;
-use std::sync::{Arc};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 

@@ -1,8 +1,4 @@
-use crate::{
-    actors::messages::{
-        FlowMessageWithMetadata,
-    },
-};
+use crate::actors::messages::FlowMessageWithMetadata;
 use actix::Message;
 
 #[derive(Message)]

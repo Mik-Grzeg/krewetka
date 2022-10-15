@@ -6,7 +6,6 @@ use crate::actors::BrokerType;
 use crate::consts::STORAGE_BUFFER_SIZE;
 use actix_broker::Broker;
 
-
 use clickhouse_rs::{row, types::Block, Pool};
 use log::debug;
 use log::info;

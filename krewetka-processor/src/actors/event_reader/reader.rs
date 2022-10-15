@@ -8,7 +8,6 @@ use async_trait::async_trait;
 
 use log::info;
 
-
 use super::super::BrokerType;
 
 use std::sync::Arc;
