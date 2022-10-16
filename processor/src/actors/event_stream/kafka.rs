@@ -1,7 +1,7 @@
 use super::Transport;
 
 use super::consts::OFFSET_COMMIT_INTERVAL;
-use crate::actors::event_reader::topic::TopicOffsetKeeper;
+use crate::actors::event_stream::topic::TopicOffsetKeeper;
 use crate::actors::messages::FlowMessageWithMetadata;
 
 use actix_broker::{Broker, SystemBroker};

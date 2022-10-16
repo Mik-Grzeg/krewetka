@@ -1,5 +1,5 @@
 [package]
-name = "krewetka-collector"
+name = "collector"
 version = "0.1.0"
 edition = "2021"
 

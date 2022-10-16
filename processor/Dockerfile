@@ -2,7 +2,7 @@ FROM lukemathwalker/cargo-chef:latest-rust-1.63.0 AS chef
 WORKDIR /app
 
 FROM chef as planner
-COPY krewetka-processor .
+COPY processor .
 RUN cargo chef prepare --recipe-path recipe.json
 
 ####################################################################################################
@@ -15,7 +15,7 @@ FROM chef as builder
 ENV USER=krewetka
 ENV UID=10001
 
-COPY krewetka-processor ./
+COPY processor ./
 
 RUN adduser \
     --disabled-password \
@@ -32,7 +32,7 @@ WORKDIR /app
 COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json
 
-COPY krewetka-processor ./
+COPY processor ./
 COPY proto ./proto
 ARG PROTO_PATH=/app/proto
 

@@ -27,7 +27,7 @@ services:
 
   collector:
     build:
-      dockerfile: ./krewetka-collector/Dockerfile
+      dockerfile: ./collector/Dockerfile
     depends_on:
       - broker
       - importer
@@ -41,12 +41,13 @@ services:
 
   processor:
     build:
-      dockerfile: ./krewetka-processor/Dockerfile
+      dockerfile: ./processor/Dockerfile
       target: processor
     depends_on:
       - broker
       - classifier_server
-      - krewetka-collector
+      - collector
+      - migrator
       - clickhouse
     environment:
       KREWETKA__KAFKA_BROKERS: "broker:9092"
@@ -61,7 +62,7 @@ services:
 
   migrator:
     build:
-      dockerfile: ./krewetka-processor/Dockerfile
+      dockerfile: ./processor/Dockerfile
       target: migrator
     depends_on:
       - clickhouse

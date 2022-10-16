@@ -1,6 +1,6 @@
 use super::messages::AckMessage;
 use crate::actors::broker::Broker;
-use crate::actors::event_reader::TopicOffsetKeeper;
+use crate::actors::event_stream::TopicOffsetKeeper;
 use crate::actors::BrokerType;
 use actix::Actor;
 use actix::Context;

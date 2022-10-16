@@ -1,18 +1,12 @@
-use crate::actors::messages::ClassifyFlowMessageWithMetadata;
-
 use super::super::messages::FlowMessageWithMetadata;
-
+use super::super::BrokerType;
+use super::kafka::KafkaState;
+use crate::actors::messages::ClassifyFlowMessageWithMetadata;
 use actix::{Actor, Context, Handler};
 use actix_broker::{BrokerIssue, BrokerSubscribe};
 use async_trait::async_trait;
-
 use log::info;
-
-use super::super::BrokerType;
-
 use std::sync::Arc;
-
-use super::kafka::KafkaState;
 
 #[async_trait]
 pub trait Transport: Send + Sync {
@@ -20,12 +14,12 @@ pub trait Transport: Send + Sync {
     // async fn send_to_actor<S: Message + Send, T: Actor + Handler<S>>(&self, msg: OwnedMessage, next: Addr<T>);
 }
 
-pub struct EventStreamReaderActor {
+pub struct EventStreamActor {
     pub channel: Arc<KafkaState>,
     // pub broker: Arc<Mutex<Broker>>,
 }
 
-impl Actor for EventStreamReaderActor {
+impl Actor for EventStreamActor {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
@@ -34,7 +28,7 @@ impl Actor for EventStreamReaderActor {
     }
 }
 
-impl Handler<FlowMessageWithMetadata> for EventStreamReaderActor {
+impl Handler<FlowMessageWithMetadata> for EventStreamActor {
     type Result = ();
 
     fn handle(&mut self, msg: FlowMessageWithMetadata, _ctx: &mut Self::Context) -> Self::Result {

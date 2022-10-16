@@ -246,6 +246,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "collector"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "clap 3.2.22",
+ "config",
+ "criterion",
+ "env_logger",
+ "lazy_static",
+ "log",
+ "mockall",
+ "pretty_assertions",
+ "prost 0.10.4",
+ "rdkafka",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "serial_test",
+ "sys-info",
+ "test-case",
+ "tokio",
+ "tokio-stream",
+ "tokio-test",
+ "tonic",
+ "tonic-build",
+ "zmq",
+]
+
+[[package]]
 name = "config"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -801,36 +831,6 @@ dependencies = [
  "pest",
  "pest_derive",
  "serde",
-]
-
-[[package]]
-name = "krewetka-collector"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "bytes",
- "clap 3.2.22",
- "config",
- "criterion",
- "env_logger",
- "lazy_static",
- "log",
- "mockall",
- "pretty_assertions",
- "prost 0.10.4",
- "rdkafka",
- "serde",
- "serde_json",
- "serde_yaml",
- "serial_test",
- "sys-info",
- "test-case",
- "tokio",
- "tokio-stream",
- "tokio-test",
- "tonic",
- "tonic-build",
- "zmq",
 ]
 
 [[package]]
