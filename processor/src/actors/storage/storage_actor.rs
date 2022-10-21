@@ -1,10 +1,12 @@
-use super::consts::RETRY_STORAGE_INSERT_INTERVAL_IN_SECS;
-use super::consts::STORAGE_BUFFER_SIZE;
-use crate::actors::acker::messages::AckMessage;
+use super::consts::{STORAGE_BUFFER_FLUSH_INTEVAL_IN_SECS, STORAGE_MAX_BUFFER_SIZE};
+use futures::task::noop_waker;
+use tokio::time::interval;
+
 use crate::actors::messages::FlowMessageWithMetadata;
 use crate::actors::messages::PersistFlowMessageWithMetadata;
 use actix::Actor;
-use actix_broker::Broker;
+
+use std::task::Context as TaskCtx;
 
 use actix::Context;
 use actix::Handler;
@@ -16,8 +18,8 @@ use log::debug;
 use log::{info, warn};
 use std::error::Error;
 use std::sync::Arc;
+
 use tokio::sync::mpsc;
-use tokio::time::sleep;
 
 use crate::actors::BrokerType;
 
@@ -34,7 +36,7 @@ impl From<ChError> for StorageError {
 
 #[async_trait]
 pub trait AStorage: 'static {
-    async fn stash(&self, msgs: Vec<PersistFlowMessageWithMetadata>) -> Result<(), StorageError>;
+    async fn stash(&self, msgs: Vec<FlowMessageWithMetadata>) -> Result<(), StorageError>;
 }
 
 pub struct StorageActor<S>
@@ -42,7 +44,7 @@ where
     S: AStorage,
 {
     storage: Arc<S>,
-    buffer_channel_sender: mpsc::Sender<PersistFlowMessageWithMetadata>,
+    buffer_channel_sender: mpsc::Sender<FlowMessageWithMetadata>,
     // pub broker: Arc<Mutex<Broker>>
 }
 
@@ -50,8 +52,8 @@ impl<S> StorageActor<S>
 where
     S: AStorage,
 {
-    pub fn new(storage: Arc<S>) -> (Self, mpsc::Receiver<PersistFlowMessageWithMetadata>) {
-        let (tx, rx) = mpsc::channel::<PersistFlowMessageWithMetadata>(STORAGE_BUFFER_SIZE);
+    pub fn new(storage: Arc<S>) -> (Self, mpsc::Receiver<FlowMessageWithMetadata>) {
+        let (tx, rx) = mpsc::channel::<FlowMessageWithMetadata>(STORAGE_MAX_BUFFER_SIZE);
 
         let slf = Self {
             storage,
@@ -89,7 +91,7 @@ where
         let tx = self.buffer_channel_sender.clone();
 
         Box::pin(async move {
-            if let Err(e) = tx.send(msg).await {
+            if let Err(e) = tx.send(msg.0).await {
                 // TODO create retry event
                 warn!("unable to send message to storage buffer: {}", e)
             }
@@ -99,41 +101,25 @@ where
 
 pub async fn flush_buffer<S: AStorage>(
     storage: Arc<S>,
-    mut buffer_recv: mpsc::Receiver<PersistFlowMessageWithMetadata>,
+    mut buffer_recv: mpsc::Receiver<FlowMessageWithMetadata>,
 ) {
-    let mut buffer: Vec<PersistFlowMessageWithMetadata> = Vec::with_capacity(STORAGE_BUFFER_SIZE);
+    let mut buffer: Vec<FlowMessageWithMetadata> = Vec::with_capacity(STORAGE_MAX_BUFFER_SIZE);
+    let mut interval = interval(STORAGE_BUFFER_FLUSH_INTEVAL_IN_SECS);
+    let waker = noop_waker();
+    let mut ctx = TaskCtx::from_waker(&waker);
 
-    let mut last_save_failed = true;
     while let Some(msg) = buffer_recv.recv().await {
-        debug!("Got msg: {:?}", msg);
         buffer.push(msg);
 
-        if buffer.len() == STORAGE_BUFFER_SIZE {
-            last_save_failed = true;
-            for try_save_interval in RETRY_STORAGE_INSERT_INTERVAL_IN_SECS {
-                if let Err(e) = storage
-                    .stash(
-                        buffer
-                            .drain(..)
-                            .collect::<Vec<PersistFlowMessageWithMetadata>>(),
-                    )
-                    .await
-                {
-                    debug!("Failed to save messages: {:?}", e);
-                    // TODO should pass those messages to nacking actor
-                } else {
-                    last_save_failed = false;
-                    break;
-                }
-                sleep(try_save_interval).await;
-            }
+        if buffer.len() % 10 == 0 {
+            info!("buffer len {}", buffer.len());
+        }
+        if interval.poll_tick(&mut ctx).is_ready() {
+            let messages_to_save = buffer.drain(..).collect::<Vec<FlowMessageWithMetadata>>();
+            info!("messages_to_save len {}", messages_to_save.len());
 
-            if last_save_failed {
-                buffer.drain(..).into_iter().for_each(|f| {
-                    Broker::<BrokerType>::issue_async(AckMessage::NackRetry(
-                        FlowMessageWithMetadata::from(f),
-                    ))
-                });
+            if let Err(e) = storage.stash(messages_to_save).await {
+                debug!("Failed to save messages: {:?}", e);
             }
         }
     }

@@ -14,10 +14,11 @@ use actix::Actor;
 use actix::Context;
 use actix::Handler;
 use actix_broker::{BrokerIssue, BrokerSubscribe};
+use log::error;
 use tokio_stream::{Stream, StreamExt};
 use tonic::transport::Channel;
 
-use log::{debug, info};
+use log::info;
 
 pub struct ClassificationActor {
     pub client: FlowMessageClassifierClient<Channel>,
@@ -43,21 +44,19 @@ impl Handler<ClassifyFlowMessageWithMetadata> for ClassificationActor {
     ) -> Self::Result {
         let mut client = self.client.clone();
         let mut msg = msg;
-        debug!("Classify actor received message");
         let broker = self.broker.clone();
 
         Box::pin(async move {
-            match client.classify(msg.flow_message.clone()).await {
+            match client.classify(msg.0.flow_message.clone()).await {
                 Ok(b) => {
-                    info!("Classify response: {:?}", b);
-                    msg.malicious = Some(b.get_ref().malicious);
+                    msg.0.malicious = Some(b.get_ref().malicious);
                     broker
                         .lock()
                         .unwrap()
                         .issue_async::<PersistFlowMessageWithMetadata>(msg.into());
                 }
                 Err(e) => {
-                    debug!("Classify response: {:?}", e);
+                    error!("Classify response: {:?}", e);
                 }
             }
         })
@@ -102,7 +101,6 @@ pub async fn streaming_classifier(
 
     while let Some(received) = resp_stream.next().await {
         let received = received.unwrap();
-        info!("received message: `{}`", received.malicious);
 
         let mut message = rx.recv().await.unwrap();
         message.malicious = Some(received.malicious);

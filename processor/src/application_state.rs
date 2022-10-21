@@ -1,13 +1,10 @@
 use crate::actors::classification_client_grpc::client::Classifier;
-use crate::actors::event_stream::kafka::OffsetGuard;
-use crate::actors::event_stream::TopicOffsetKeeper;
+use crate::actors::event_stream::kafka::{ConsumerOffsetGuard, ProcessingAgent};
+use crate::actors::event_stream::{ArcedRetrier, EventStreamActor, Retrier, TopicOffsetKeeper};
 use crate::actors::storage::storage_actor::StorageActor;
 
 use crate::actors::broker::Broker;
-use crate::actors::event_stream::{
-    kafka::{self, KafkaState},
-    Transport,
-};
+use crate::actors::event_stream::{kafka::KafkaState, Transport};
 use crate::actors::storage::storage_actor;
 use crate::actors::storage::{clickhouse::ClickhouseState, storage_actor::StorageError};
 use crate::consts::DEFAULT_ENV_VAR_PREFIX;
@@ -18,9 +15,10 @@ use actix::Actor;
 use config::builder::DefaultState;
 use config::{Config, ConfigBuilder, Environment};
 use log::error;
+use std::collections::BinaryHeap;
 use std::sync::Mutex;
 
-use crate::actors::{classification_client_grpc, event_stream};
+use crate::actors::classification_client_grpc;
 
 use serde::Deserialize;
 use std::sync::Arc;
@@ -36,7 +34,8 @@ pub enum ConfigErr {
 
 pub struct ApplicationState {
     config: Config,
-    kafka_state: Arc<KafkaState>,
+    // kafka_settings: KafkaSettings,
+    brokers: String,
     clickhouse_state: Arc<ClickhouseState>,
     classification_state: Classifier,
 }
@@ -58,10 +57,7 @@ impl ApplicationState {
             get_config::<ProcessorSettings>(&config).expect("Getting config failed");
 
         // set kafka settings
-        let kafka_state = Arc::new(kafka::KafkaState::new(
-            deserialized_config.kafka_topic,
-            deserialized_config.kafka_brokers,
-        ));
+        let brokers = deserialized_config.kafka_brokers;
         // set clickhouse settings
         let clickhouse_state = Arc::new(ClickhouseState::new(
             deserialized_config.clickhouse_settings,
@@ -74,7 +70,7 @@ impl ApplicationState {
 
         let state = ApplicationState {
             config,
-            kafka_state,
+            brokers,
             clickhouse_state,
             classification_state,
         };
@@ -135,19 +131,39 @@ impl ApplicationState {
         .start();
 
         // start event streaming actor
-        event_stream::EventStreamActor {
-            channel: self.kafka_state.clone(),
-        }
-        .start();
 
-        // start task which gruards offset commits
-        let mut offset_guard = OffsetGuard::new(self.kafka_state.clone(), &self.kafka_state.topic);
-        let acker = task::spawn(async move { offset_guard.inc_offset().await });
+        let consumer = Arc::new(KafkaState::get_consumer(&self.brokers));
+        let heap = BinaryHeap::new();
+        let heap_ref = Arc::new(Mutex::new(heap));
+        let mut offset_guard = ConsumerOffsetGuard::new(&consumer.clone(), "flows", &heap_ref);
+
+        // processing agent
+        let producer = KafkaState::get_producer(&self.brokers);
+        let processing_agent = Arc::new(ProcessingAgent::new(producer));
+
+        let retrier = Arc::new(Retrier::default());
+
+        let event_stream_actor = EventStreamActor {
+            processor: processing_agent.clone(),
+            retrier: retrier.clone(),
+            offset_heap: heap_ref.clone(),
+        };
+
+        event_stream_actor.start();
+
+        // start background retrier
+        let wrapped_retrier = ArcedRetrier::new(retrier.clone());
+
+        // // start task which gruards offset commits
+        let acker = task::spawn(async move { offset_guard.inc_offset("flows".to_owned()).await });
+
+        // retrier
+        let retrier = wrapped_retrier.init_retry();
 
         // start consuming messages on kafka
-        self.kafka_state.consume().await;
+        let processing_agent_clone = processing_agent.clone();
+        let processing = processing_agent_clone.consume("flows".to_owned(), self.brokers.clone());
 
-        flusher.await;
-        acker.await;
+        tokio::join!(retrier, processing, acker, flusher,);
     }
 }

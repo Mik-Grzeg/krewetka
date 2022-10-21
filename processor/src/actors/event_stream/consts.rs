@@ -1,1 +1,2 @@
 pub const OFFSET_COMMIT_INTERVAL: u64 = 5;
+pub const BASE_RETRY_INTERVAL_IN_SECS: u64 = 60;

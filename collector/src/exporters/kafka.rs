@@ -3,6 +3,8 @@ use std::fmt;
 
 use std::time::Duration;
 
+use chrono::Utc;
+use uuid::Uuid;
 use async_trait::async_trait;
 use log::{debug, error};
 use rdkafka::config::ClientConfig;
@@ -56,7 +58,13 @@ impl Export for KafkaExporter {
                 FutureRecord::to(&self.settings.topic)
                     .payload(msg)
                     .key("KREWETKA")
-                    .headers(OwnedHeaders::new().add::<str>("host-identifier", identifier)),
+                    .headers(OwnedHeaders::new()
+                            .add::<str>("host-identifier-x", identifier)
+                            .add::<str>("message-id-x", &Uuid::new_v4().to_string())
+                            .add::<str>("timestamp-x", &Utc::now().timestamp_millis().to_string())
+                            .add::<str>("retry-x", &0.to_string())
+                            // .add::<bool>("proto-encoding-x", true)
+                    ),
                 Duration::from_secs(0),
             )
             .await;
