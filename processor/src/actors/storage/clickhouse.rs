@@ -4,7 +4,7 @@ use super::storage_actor::{AStorage, StorageError};
 use crate::actors::acker::messages::AckMessage;
 use crate::actors::BrokerType;
 use actix_broker::Broker;
-
+use std::time::Duration;
 use chrono::{TimeZone, Utc};
 use clickhouse_rs::{row, types::Block, Pool};
 
@@ -56,12 +56,17 @@ impl ClickhouseState {
 #[async_trait]
 impl AStorage for ClickhouseState {
     async fn stash(&self, msgs: Vec<FlowMessageWithMetadata>) -> Result<(), StorageError> {
-        let mut client = self
+        let handler = self
             .pool
             .as_ref()
-            .get_handle()
-            .await
-            .map_err(|e| StorageError::Database(Box::new(e)))?;
+            .get_handle();
+            // .await
+            // .map_err(|e| StorageError::Database(Box::new(e)))?;
+        
+        let mut client = match tokio::time::timeout(Duration::from_secs(3), handler).await {
+            Ok(res) => res.map_err(|e| StorageError::Database(Box::new(e)))?,
+            Err(e) => return Err(StorageError::Database(Box::new(e))),
+        };
 
         let mut block = Block::with_capacity(msgs.len());
         for f in msgs.iter() {
