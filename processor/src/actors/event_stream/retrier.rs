@@ -1,6 +1,7 @@
+use super::kafka::CustomContext;
 use super::reader::Transport;
 use actix::clock::{sleep_until, Instant};
-use rdkafka::{consumer::Consumer, producer::FutureRecord, Message};
+use rdkafka::{consumer::{Consumer, StreamConsumer}, producer::FutureRecord, Message};
 
 use super::consts::BASE_RETRY_INTERVAL_IN_SECS;
 
@@ -151,7 +152,7 @@ impl Retrier {
 
 #[async_trait]
 impl Transport for Retrier {
-    async fn consume(&self, _topic: String, _brokers: String) {
+    async fn consume(&self, consumer: Arc<StreamConsumer<CustomContext>>, topic: String, _brokers: String) {
         todo!()
     }
 

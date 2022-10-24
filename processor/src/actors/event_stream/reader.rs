@@ -1,5 +1,5 @@
 use super::super::BrokerType;
-use super::kafka::ProcessingAgent;
+use super::kafka::{ProcessingAgent, CustomContext};
 use super::{super::messages::FlowMessageWithMetadata, retrier::Retrier};
 use crate::actors::acker::messages::AckMessage;
 use crate::actors::messages::ClassifyFlowMessageWithMetadata;
@@ -7,13 +7,14 @@ use actix::{Actor, Context, Handler, ResponseFuture};
 use actix_broker::{BrokerIssue, BrokerSubscribe};
 use async_trait::async_trait;
 use log::{info, warn};
+use rdkafka::consumer::StreamConsumer;
 use std::collections::BinaryHeap;
 use std::sync::Arc;
 use std::sync::Mutex;
 
 #[async_trait]
 pub trait Transport: Send + Sync {
-    async fn consume(&self, topic: String, brokers: String);
+    async fn consume(&self, consumer: Arc<StreamConsumer<CustomContext>>, topic: String, brokers: String);
     async fn produce(&self, topic: &str, brokers: &str, msg: &FlowMessageWithMetadata);
     // async
     // async fn send_to_actor<S: Message + Send, T: Actor + Handler<S>>(&self, msg: OwnedMessage, next: Addr<T>);
@@ -54,7 +55,9 @@ impl Handler<AckMessage> for EventStreamActor {
 
         Box::pin(async move {
             match msg {
-                AckMessage::Ack(offset) => offset_guard.lock().unwrap().push(offset),
+                AckMessage::Ack(offset) =>  {
+                    offset_guard.lock().unwrap().push(-1*offset);
+                },
                 AckMessage::NackRetry(mut msg) => {
                     warn!(
                         "Failed to process message with id: {} after {} try",
@@ -62,15 +65,16 @@ impl Handler<AckMessage> for EventStreamActor {
                     );
                     msg.metadata.retry += 1;
 
-                    processor
-                        .produce(
-                            &retrier
-                                .get_topic_based_on_retry(msg.metadata.retry)
-                                .unwrap(),
-                            retrier.get_brokers_retry(),
-                            &msg,
-                        )
-                        .await;
+                    if let Some(t) = &retrier.get_topic_based_on_retry(msg.metadata.retry) {
+                        processor
+                            .produce(
+                                t,
+                                retrier.get_brokers_retry(),
+                                &msg,
+                            )
+                            .await;
+                        offset_guard.lock().unwrap().push(-1 * msg.metadata.offset.unwrap());
+                    }
                 }
             }
         })

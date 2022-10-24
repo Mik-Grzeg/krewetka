@@ -4,13 +4,19 @@ use super::consts::OFFSET_COMMIT_INTERVAL;
 
 use crate::actors::messages::{FlowMessageMetadata, FlowMessageWithMetadata};
 
+
 use actix_broker::{Broker, SystemBroker};
 use log::warn;
+use rdkafka::Offset;
+use rdkafka::consumer::CommitMode;
 use rdkafka::error::KafkaError;
+use rdkafka::error::KafkaResult;
 use rdkafka::producer::FutureProducer;
 use rdkafka::producer::FutureRecord;
+use core::panic;
 use std::str::Utf8Error;
 use std::sync::Mutex;
+use std::sync::MutexGuard;
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -26,8 +32,9 @@ use prost::Message as PBMessage;
 use rdkafka::message::{BorrowedHeaders, FromBytes, Headers, OwnedHeaders, OwnedMessage};
 use rdkafka::{
     config::RDKafkaLogLevel,
-    consumer::{Consumer, StreamConsumer},
+    consumer::{Consumer, StreamConsumer, ConsumerContext, Rebalance},
     ClientConfig, Message, TopicPartitionList,
+    ClientContext
 };
 
 use tokio_stream::StreamExt;
@@ -50,26 +57,27 @@ impl ProcessingAgent {
 
 #[async_trait]
 impl Transport for ProcessingAgent {
-    async fn consume(&self, topic: String, brokers: String) {
+    async fn consume(&self, consumer: Arc<StreamConsumer<CustomContext>>, topic: String, brokers: String) {
         info!("Starting to consume messages from kafka [topic: {}]", topic);
-        let consumer = KafkaState::get_consumer(&brokers);
-        if let Err(e) = consumer.subscribe(&[&topic]) {
-            error!("unable to subscribe to {}\nerror: {}", topic, e)
+
+        let partition = 0;
+        let starting_offset = match get_offset_for_topic(&consumer, &topic) {
+            Offset::Invalid => Offset::from_raw(0),
+            offset => offset,
         };
 
-        let mut streamer = consumer.stream();
+        if let Err(e) = consumer.seek(&topic, partition, starting_offset, Duration::from_secs(3)) {
+            error!("unable to seek offset {:?} in topic {} on partition {} with error: {}", starting_offset, topic, partition, e);
+        }
 
-        while let Some(event) = streamer.next().await {
-            match event {
-                Ok(ev) => {
-                    let response = Self::send_to_actor(ev.detach()).await;
-                    debug!("Actor response: {:?}", response);
-                }
-                Err(e) => {
-                    error!("Unable to receive kafka event: {}", e);
-                    continue;
-                }
-            }
+        loop {
+            let event = match consumer.recv().await {
+                Ok(e) => e,
+                Err(e) => panic!("Jakis error lol: {}", e)
+            };
+            debug!("Fetched offset: {}", event.offset());
+            let response = Self::send_to_actor(event.detach()).await;
+            debug!("Actor response: {:?}", response);
         }
     }
 
@@ -102,7 +110,7 @@ impl Transport for ProcessingAgent {
             Err((err, msg)) => {
                 error!("unable to produce message: {:?}\nerror: {}", msg, err)
             }
-            _ => info!("message produced to topic {}", topic),
+            _ => debug!("message produced to topic {}", topic),
         }
     }
 }
@@ -249,21 +257,22 @@ pub struct ConsumerOffsetGuard {
     processed_offsets: Arc<Mutex<BinaryHeap<i64>>>,
     last_stored_offset: i64,
     topic: String,
-    consumer: Arc<StreamConsumer>,
+    consumer: Arc<StreamConsumer<CustomContext>>,
 }
 
 impl ConsumerOffsetGuard {
     pub fn new(
-        consumer: &Arc<StreamConsumer>,
+        consumer: Arc<StreamConsumer<CustomContext>>,
         topic: &str,
-        processed_offsets: &Arc<Mutex<BinaryHeap<i64>>>,
+        processed_offsets: Arc<Mutex<BinaryHeap<i64>>>,
     ) -> Self {
-        consumer
-            .subscribe(&[topic])
-            .unwrap_or_else(|_| panic!("Unable to subscribe to topic {}", topic));
 
-        let consumer = Arc::clone(consumer);
-        let last_stored_offset = ConsumerOffsetGuard::get_offset_for_topic(&consumer, topic);
+        let consumer = Arc::clone(&consumer);
+        let last_stored_offset = match get_offset_for_topic(&consumer, topic) {
+            Offset::Invalid => -1,
+            Offset::Offset(x) => x,
+            c => panic!("weird offset: {:?}", c)
+        };
 
         Self {
             processed_offsets: processed_offsets.clone(),
@@ -277,51 +286,81 @@ impl ConsumerOffsetGuard {
         self.processed_offsets.clone().lock().unwrap().push(offset)
     }
 
+    fn peek_heap(&self, peek: &Option<&i64>) -> bool {
+        match *peek {
+            Some(x) => {
+                match x * -1 - self.last_stored_offset {
+                    1 | 0 => true,
+                    _ => false
+                }
+            },
+            None => false
+        } 
+    }
+
     pub async fn inc_offset(&mut self, topic: String) {
         let heap = self.processed_offsets.clone();
 
         loop {
-            sleep(Duration::from_secs(OFFSET_COMMIT_INTERVAL)).await;
+            sleep(Duration::from_secs(2)).await;
 
-            if let Some(smallest_processed_offset) = heap.lock().unwrap().peek() {
-                if smallest_processed_offset * -1 - self.last_stored_offset == 1 {
-                    match self.store_offset(smallest_processed_offset * -1) {
-                        Ok(()) => self.last_stored_offset = -heap.lock().unwrap().pop().unwrap(),
-                        Err(_err) => {
-                            warn!("Couldn't store offset for topic: {}", topic);
-                            continue;
-                        }
-                    }
+            let mut heap_peek = heap.lock().unwrap();
+
+            while self.peek_heap(&heap_peek.peek()) {
+                self.last_stored_offset = -1 * heap_peek.pop().unwrap();  
+            } 
+
+            // make it into a stream with a timeout to commit
+            match self.store_offset(self.last_stored_offset) {
+                Ok(()) => {
+                    info!("Updated last_stored_offset to {}", self.last_stored_offset);
+                }
+                Err(e) => {
+                    warn!("Couldn't store offset for topic: {}", topic);
+                    // panic!("Something fucked up: {}", e);
                 }
             }
+
         }
     }
 
     fn store_offset(&self, offset: i64) -> Result<(), KafkaError> {
-        self.consumer.store_offset(&self.topic, 0, offset)
-    }
-
-    fn get_offset_for_topic(consumer: &Arc<StreamConsumer>, topic: &str) -> i64 {
         let mut tpl = TopicPartitionList::new();
-        let _ = tpl.add_topic_unassigned(topic);
+        if let Err(e) = tpl.add_partition_offset(&self.topic, 0, Offset::from_raw(offset)) {
+            error!("STORAGE OFFSET SMTH WRONG: {}", e);
+        };
 
-        for _ in 0..3 {
-            match consumer.committed_offsets(tpl.clone(), Duration::from_secs(3)) {
-                Ok(list) => {
-                    let elemts = list.elements_for_topic(topic);
-                    if elemts.len() == 1 {
-                        return elemts[0].offset().to_raw().unwrap();
-                    } else {
-                        panic!("Topic is missing: {}", topic);
-                    }
-                }
-                Err(_err) => {
-                    std::thread::sleep(Duration::from_secs(3));
-                }
-            };
+        match self.consumer.commit(&tpl, CommitMode::Sync) {
+            Err(e) => {
+                error!("unable to store offset: {}", e);
+                Err(e)
+            }
+            Ok(ok) => {
+                info!("stored offset: {} for topic {}", offset, &self.topic);
+                Ok(ok)
+            }
         }
-        panic!("Could not get offset for topic");
     }
+}
+
+fn get_offset_for_topic(consumer: &StreamConsumer<CustomContext>, topic: &str) -> Offset {
+    let mut tpl = TopicPartitionList::new();
+    let _ = tpl.add_partition(topic, 0);
+
+    for i in 0..3 {
+        info!("Offset chjecking iteration {}", i);
+        match consumer.committed_offsets(tpl.clone(), Duration::from_secs(3)) {
+            Ok(list) => {
+                let topic_map = list.to_topic_map();
+                debug!("topic map: {:?}", topic_map);
+                return topic_map.get(&(topic.to_owned(), 0)).unwrap().to_owned()
+            }
+            Err(_err) => {
+                std::thread::sleep(Duration::from_secs(3));
+            }
+        };
+    }
+    panic!("Could not get offset for topic");
 }
 
 pub struct KafkaState {
@@ -329,16 +368,18 @@ pub struct KafkaState {
 }
 
 impl KafkaState {
-    pub fn get_consumer(brokers: &str) -> StreamConsumer {
-        let consumer: StreamConsumer = ClientConfig::new()
+    pub fn get_consumer(brokers: &str) -> StreamConsumer<CustomContext> {
+        let ctx = CustomContext;
+        let consumer: StreamConsumer<CustomContext> = ClientConfig::new()
             .set("bootstrap.servers", brokers)
             .set("enable.partition.eof", "false")
             .set("session.timeout.ms", "6000")
-            .set("enable.auto.commit", "true")
-            .set("enable.auto.offset.store", "false")
-            .set("group.id", "kafka-krewetka-group")
+            .set("enable.auto.commit", "false")
+            // .set("enable.auto.offset.store", "false")
+            .set("auto.offset.reset", "earliest")
+            .set("group.id", "krewetka-group")
             .set_log_level(RDKafkaLogLevel::Debug)
-            .create()
+            .create_with_context(ctx)
             .expect("Kafka consumer creation error");
         // consumer.subscribe(&[topic]) // TODO handle properly
         //     .expect(&format!("unable to acquire consumer for topic: {} borkers: {}", topic, brokers));
@@ -350,7 +391,6 @@ impl KafkaState {
         let producer: FutureProducer = ClientConfig::new()
             .set("bootstrap.servers", brokers.clone())
             .set("message.timeout.ms", "5000")
-            .set("enable.auto.commit", "true")
             .create()
             .expect("Producer creation error");
 
@@ -364,6 +404,7 @@ impl KafkaState {
             .set("session.timeout.ms", "6000")
             .set("enable.auto.commit", "true")
             .set("enable.auto.offset.store", "false")
+            .set("enable.offset.reset", "earliest")
             .set("group.id", "kafka-krewetka-group")
             .set_log_level(RDKafkaLogLevel::Debug)
             .create()
@@ -421,3 +462,21 @@ impl KafkaState {
 //         todo!()
 //     }
 // }
+
+pub struct CustomContext;
+
+impl ClientContext for CustomContext {}
+
+impl ConsumerContext for CustomContext {
+    fn pre_rebalance(&self, rebalance: &Rebalance) {
+        info!("Pre rebalance {:?}", rebalance);
+    }
+
+    fn post_rebalance(&self, rebalance: &Rebalance) {
+        info!("Post rebalance {:?}", rebalance);
+    }
+
+    fn commit_callback(&self, result: KafkaResult<()>, _offsets: &TopicPartitionList) {
+        info!("Committing offsets: {:?}", result);
+    }
+}

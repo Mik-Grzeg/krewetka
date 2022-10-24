@@ -12,6 +12,7 @@ use crate::pb::flow_message_classifier_client::FlowMessageClassifierClient;
 use crate::settings::ProcessorSettings;
 use actix::Actor;
 
+use rdkafka::consumer::{StreamConsumer, Consumer};
 use config::builder::DefaultState;
 use config::{Config, ConfigBuilder, Environment};
 use log::error;
@@ -133,9 +134,13 @@ impl ApplicationState {
         // start event streaming actor
 
         let consumer = Arc::new(KafkaState::get_consumer(&self.brokers));
+        consumer
+            .subscribe(&["flows"])
+            .unwrap_or_else(|_| panic!("Unable to subscribe to topic {}", "flows"));
+
         let heap = BinaryHeap::new();
         let heap_ref = Arc::new(Mutex::new(heap));
-        let mut offset_guard = ConsumerOffsetGuard::new(&consumer.clone(), "flows", &heap_ref);
+        let mut offset_guard = ConsumerOffsetGuard::new(consumer.clone(), "flows", heap_ref.clone());
 
         // processing agent
         let producer = KafkaState::get_producer(&self.brokers);
@@ -162,7 +167,7 @@ impl ApplicationState {
 
         // start consuming messages on kafka
         let processing_agent_clone = processing_agent.clone();
-        let processing = processing_agent_clone.consume("flows".to_owned(), self.brokers.clone());
+        let processing = processing_agent_clone.consume(consumer.clone(), "flows".to_owned(), self.brokers.clone());
 
         tokio::join!(retrier, processing, acker, flusher,);
     }

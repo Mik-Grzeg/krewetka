@@ -111,12 +111,9 @@ pub async fn flush_buffer<S: AStorage>(
     while let Some(msg) = buffer_recv.recv().await {
         buffer.push(msg);
 
-        if buffer.len() % 10 == 0 {
-            info!("buffer len {}", buffer.len());
-        }
         if interval.poll_tick(&mut ctx).is_ready() {
             let messages_to_save = buffer.drain(..).collect::<Vec<FlowMessageWithMetadata>>();
-            info!("messages_to_save len {}", messages_to_save.len());
+            info!("messages_to_save len {}, last batch speed {} rps", messages_to_save.len(), messages_to_save.len() as u64/STORAGE_BUFFER_FLUSH_INTEVAL_IN_SECS.as_secs());
 
             if let Err(e) = storage.stash(messages_to_save).await {
                 debug!("Failed to save messages: {:?}", e);
