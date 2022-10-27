@@ -1,25 +1,32 @@
 use super::super::transport::RetrierExt;
 use super::consts::*;
+
 use super::get_consumer;
 use super::get_producer;
+use crate::actors::event_stream::kafka::offset_guard::ConsumerOffsetGuard;
 use crate::actors::messages::FlowMessageMetadata;
 use async_trait::async_trait;
+use chrono::{Duration as ChronoDuration, Utc};
 use futures::StreamExt;
 use log::*;
 use rdkafka::consumer::Consumer;
+use tokio::task;
+use tokio::time::sleep;
+use tokio::time::Duration;
+
 use rdkafka::message::Message;
 use rdkafka::message::OwnedHeaders;
 use rdkafka::producer::FutureRecord;
-use tokio::time::{sleep_until, Duration, Instant};
+use std::sync::Arc;
 
 #[async_trait]
 impl RetrierExt for Retrier {
     async fn spawn_retriers(&self) {
         info!("Spawning retriers");
         tokio::join!(
-            self.clone().run_retrier(1),
-            self.clone().run_retrier(2),
-            self.clone().run_retrier(3),
+            self.run_retrier(1),
+            self.run_retrier(2),
+            self.run_retrier(3),
         );
     }
 
@@ -77,8 +84,7 @@ impl Default for Retrier {
 
 impl Retrier {
     async fn run_retrier(&self, retry: usize) {
-        info!("Starting mega retrier_{}", retry);
-        let consumer = get_consumer(&self.brokers);
+        let consumer = Arc::new(get_consumer(&self.brokers));
         let producer = get_producer(&self.brokers);
 
         let destination_topic = match self.get_topic_based_on_retry(retry) {
@@ -86,11 +92,24 @@ impl Retrier {
             None => return,
         };
 
-        consumer.subscribe(&[&destination_topic]);
+        let offset_guard = Arc::new(ConsumerOffsetGuard::new(&consumer, &destination_topic));
+
+        let offset_clone = offset_guard.clone();
+        let cons_clone = consumer.clone();
+        let guard_fut = task::spawn(async move {
+            offset_clone.inc_offset(&cons_clone).await;
+        });
+
+        if let Err(e) = consumer.subscribe(&[&destination_topic]) {
+            error!(
+                "unabel to subscribe to retrier {} topic: {}",
+                destination_topic, e
+            );
+        }
 
         let mut stream = consumer.stream();
-        let retry_interval = Duration::from_secs(BASE_RETRY_INTERVAL_IN_SECS.pow(retry as u32));
-        info!("Starting self.0 {}", destination_topic);
+        let retry_interval = (BASE_RETRY_INTERVAL_IN_MILLIS * 10_u64.pow(retry as u32)) as i64;
+        info!("Starting retrier, topic: [{}]", destination_topic);
 
         while let Some(event) = stream.next().await {
             match event {
@@ -101,12 +120,16 @@ impl Retrier {
                     metadata.offset = Some(ev.offset());
 
                     if let Some(x) = ev.timestamp().to_millis() {
-                        debug!("Sleeping for .. {}", x);
-                        let mut deadline = Instant::now() - Duration::from_millis(x as u64);
-                        deadline += retry_interval;
-                        sleep_until(deadline).await;
+                        // TODO pause consumer because it may timeout for the higher retry tiers
+                        let deadline = ChronoDuration::milliseconds(
+                            retry_interval - (Utc::now().timestamp_millis() - x),
+                        )
+                        .num_minutes();
+                        if deadline > 0 {
+                            sleep(Duration::from_secs(deadline as u64 * 60)).await;
+                        }
 
-                        if let Err((e, _)) = producer
+                        match producer
                             .send(
                                 FutureRecord::to(&self.topic_original)
                                     .payload(ev.payload().unwrap())
@@ -122,10 +145,15 @@ impl Retrier {
                             )
                             .await
                         {
-                            error!(
+                            Err((e, _)) => error!(
                                 "Error occured while trying to produce message on retry topic: {}",
                                 e
-                            );
+                            ),
+                            Ok(_) => {
+                                let offst = metadata.offset.unwrap();
+
+                                offset_guard.stash_processed_offset(offst);
+                            }
                         }
                     }
                 }
@@ -137,5 +165,6 @@ impl Retrier {
                 }
             }
         }
+        guard_fut.await.unwrap();
     }
 }

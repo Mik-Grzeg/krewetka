@@ -7,8 +7,6 @@ use crate::actors::storage::storage_actor::StorageActor;
 
 use actix::clock::sleep;
 
-use crate::actors::broker::Broker as MyBroker;
-
 use crate::actors::storage::{clickhouse::ClickhouseState, storage_actor::StorageError};
 use crate::consts::DEFAULT_ENV_VAR_PREFIX;
 use crate::pb::flow_message_classifier_client::FlowMessageClassifierClient;
@@ -20,7 +18,6 @@ use actix_broker::SystemBroker;
 use config::builder::DefaultState;
 use config::{Config, ConfigBuilder, Environment};
 use log::error;
-use std::sync::Mutex;
 
 use crate::actors::classification_client_grpc;
 
@@ -107,27 +104,19 @@ impl ApplicationState {
             }
         });
 
-        // create wrapped actix broker
-        let actor_broker = Arc::new(Mutex::new(MyBroker));
-
         // init storage actor
-        let storage_actor = StorageActor::new(self.clickhouse_state.clone(), actor_broker.clone());
-        storage_actor.start();
-
-        task::spawn(async move {
-            Broker::<SystemBroker>::issue_async(InitFlusher {});
-        })
-        .await;
+        StorageActor::new(self.clickhouse_state.clone()).start();
 
         // init classification actor
+        let grpc_client =
+            match FlowMessageClassifierClient::connect(self.classification_state.dsn()).await {
+                Ok(c) => c,
+                Err(e) => {
+                    panic!("unable to connect with classification server: {:?}", e)
+                }
+            };
         classification_client_grpc::client::ClassificationActor {
-            client: FlowMessageClassifierClient::connect(format!(
-                "http://{}:{}",
-                self.classification_state.host, self.classification_state.port
-            ))
-            .await
-            .unwrap(),
-            broker: actor_broker.clone(),
+            client: grpc_client,
         }
         .start();
 
@@ -136,7 +125,7 @@ impl ApplicationState {
         let retrier = Arc::new(Retrier::default());
 
         let event_stream_actor = EventStreamActor::<KafkaProcessingAgent, Retrier> {
-            processor: processing_agent.clone(),
+            processor: processing_agent,
             retrier,
         };
 
@@ -144,10 +133,7 @@ impl ApplicationState {
 
         task::spawn(async move {
             Broker::<SystemBroker>::issue_async(InitRetrier);
-        })
-        .await;
-
-        task::spawn(async move {
+            Broker::<SystemBroker>::issue_async(InitFlusher {});
             Broker::<SystemBroker>::issue_async(InitConsumer);
         })
         .await;

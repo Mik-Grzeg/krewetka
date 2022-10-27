@@ -10,7 +10,6 @@ use actix::Actor;
 use futures::stream::StreamExt;
 use log::error;
 
-use crate::actors::broker::Broker as MyBroker;
 use actix::Context;
 use actix::Handler;
 use actix::ResponseFuture;
@@ -55,7 +54,7 @@ impl<S> StorageActor<S>
 where
     S: AStorage,
 {
-    pub fn new(storage: Arc<S>, _broker: Arc<Mutex<MyBroker>>) -> Self {
+    pub fn new(storage: Arc<S>) -> Self {
         let buffer = Arc::new(Mutex::new(Vec::with_capacity(STORAGE_MAX_BUFFER_SIZE)));
 
         Self { storage, buffer }
@@ -120,13 +119,10 @@ where
 
                 if !messages_to_save.is_empty() {
                     match storage.stash(messages_to_save).await {
-                        Ok(s) => s
-                            .into_iter()
-                            .for_each(Broker::<BrokerType>::issue_async),
+                        Ok(s) => s.into_iter().for_each(Broker::<BrokerType>::issue_async),
                         Err(StorageError::DatabaseSave((e, s))) => {
                             error!("failed to save batch: {:?}", e);
-                            s.into_iter()
-                                .for_each(Broker::<BrokerType>::issue_async)
+                            s.into_iter().for_each(Broker::<BrokerType>::issue_async)
                         }
                         Err(_) => {
                             panic!("it is imposible to be here")

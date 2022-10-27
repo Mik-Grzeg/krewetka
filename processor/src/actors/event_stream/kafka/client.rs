@@ -6,7 +6,7 @@ use rdkafka::producer::FutureProducer;
 
 pub fn get_producer(brokers: &str) -> FutureProducer {
     let producer: FutureProducer = ClientConfig::new()
-        .set("bootstrap.servers", brokers.clone())
+        .set("bootstrap.servers", brokers)
         .set("message.timeout.ms", "5000")
         .create()
         .expect("Producer creation error");

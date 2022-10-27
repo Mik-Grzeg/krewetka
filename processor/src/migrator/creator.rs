@@ -12,8 +12,8 @@ pub fn hasher<T: Hash>(t: T) -> u64 {
     hasher.finish()
 }
 
-pub fn create_migration_blank_file(dir: &PathBuf) {
-    let mut dir = dir.clone();
+pub fn create_migration_blank_file(dir: PathBuf) {
+    let mut dir = dir;
     let ext = "sql";
     let t_time = Local::now().format("%s");
     let time = format!("{}.{}", t_time, ext);

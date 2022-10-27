@@ -40,7 +40,7 @@ impl ActionRunner {
                 migrations_dir_path,
             } => {
                 info!("Creating new migration file in {:?}", migrations_dir_path);
-                create_migration_blank_file(migrations_dir_path);
+                create_migration_blank_file(migrations_dir_path.to_owned());
             }
             Self::Apply {
                 migrations_dir_path,

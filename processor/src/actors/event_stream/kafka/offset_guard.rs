@@ -54,27 +54,28 @@ impl ConsumerOffsetGuard {
     }
 
     pub fn stash_processed_offset(&self, offset: i64) {
-        self.processed_offsets
-            .clone()
-            .lock()
-            .unwrap()
-            .push(-offset)
+        self.processed_offsets.clone().lock().unwrap().push(-offset)
     }
 
     fn peek_heap(&self, peek: &Option<&i64>, last_stored_offset: &i64) -> bool {
         match *peek {
-           
-            Some(x) =>  matches!(x * -1 - last_stored_offset, 1 | 0),
+            Some(x) => matches!(x * -1 - last_stored_offset, 1 | 0),
             None => false,
         }
     }
 
     pub async fn inc_offset(&self, consumer: &StreamConsumer<CustomContext>) {
         let heap = self.processed_offsets.clone();
+        info!(
+            "Spawned offset incrementer for {} with current offset {:?}",
+            self.topic,
+            self.last_stored_offset.lock().unwrap()
+        );
 
         loop {
             sleep(Duration::from_secs(2)).await;
 
+            info!("[{}] Heap :{:?}", self.topic, heap.lock().unwrap());
             let mut heap_peek = heap.lock().unwrap();
 
             let mut last_stored_offset = self.last_stored_offset.lock().unwrap();

@@ -1,5 +1,3 @@
-use crate::actors::broker::Broker;
-
 use crate::actors::messages::{ClassifyFlowMessageWithMetadata, PersistFlowMessageWithMetadata};
 use crate::actors::BrokerType;
 use crate::{
@@ -7,13 +5,11 @@ use crate::{
     pb::{flow_message_classifier_client::FlowMessageClassifierClient, FlowMessage},
 };
 use actix::ResponseFuture;
-use std::sync::Arc;
-use std::sync::Mutex;
 
 use actix::Actor;
 use actix::Context;
 use actix::Handler;
-use actix_broker::{BrokerIssue, BrokerSubscribe};
+use actix_broker::{Broker, BrokerIssue, BrokerSubscribe};
 use log::error;
 use tokio_stream::{Stream, StreamExt};
 use tonic::transport::Channel;
@@ -22,7 +18,6 @@ use log::info;
 
 pub struct ClassificationActor {
     pub client: FlowMessageClassifierClient<Channel>,
-    pub broker: Arc<Mutex<Broker>>,
 }
 
 impl Actor for ClassificationActor {
@@ -44,16 +39,13 @@ impl Handler<ClassifyFlowMessageWithMetadata> for ClassificationActor {
     ) -> Self::Result {
         let mut client = self.client.clone();
         let mut msg = msg;
-        let broker = self.broker.clone();
 
         Box::pin(async move {
             match client.classify(msg.0.flow_message.clone()).await {
                 Ok(b) => {
                     msg.0.malicious = Some(b.get_ref().malicious);
-                    broker
-                        .lock()
-                        .unwrap()
-                        .issue_async::<PersistFlowMessageWithMetadata>(msg.into());
+
+                    Broker::<BrokerType>::issue_async::<PersistFlowMessageWithMetadata>(msg.into());
                 }
                 Err(e) => {
                     error!("Classify response: {:?}", e);
@@ -66,6 +58,12 @@ impl Handler<ClassifyFlowMessageWithMetadata> for ClassificationActor {
 pub struct Classifier {
     pub host: String,
     pub port: u16,
+}
+
+impl Classifier {
+    pub fn dsn(&self) -> String {
+        format!("http://{}:{}", self.host, self.port)
+    }
 }
 
 pub fn classifier_requests_iter() -> impl Stream<Item = FlowMessage> {

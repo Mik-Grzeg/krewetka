@@ -72,9 +72,7 @@ where
             let consuming_fut = processor.consume();
             let guarding_fut = processor.guard_acks();
 
-            match tokio::join!(consuming_fut, guarding_fut) {
-                ((), ()) => (),
-            }
+            let ((), ()) = tokio::join!(consuming_fut, guarding_fut);
         })
     }
 }
@@ -120,7 +118,9 @@ where
                         processor
                             .produce(t, retrier.get_brokers_retry(), &msg)
                             .await;
-                        processor.ack(msg.metadata.offset.unwrap());
+                        let offst = msg.metadata.offset.unwrap();
+                        info!("Offset to nackretry: {}", offst);
+                        processor.ack(offst);
                     }
                 }
             }
