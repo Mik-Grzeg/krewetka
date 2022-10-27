@@ -1,10 +1,19 @@
 use crate::pb::FlowMessage;
 
+use super::event_stream::errors::EventStreamError;
 use actix::Message;
 
 pub enum ProcessedFinished {
     Ack(i64),
     Nack(i64),
+}
+
+#[derive(Message, Debug)]
+#[rtype(result = "()")]
+#[derive(Clone)]
+pub enum AckMessage {
+    Ack(i64),
+    NackRetry(FlowMessageWithMetadata),
 }
 
 #[derive(Message)]
@@ -18,6 +27,16 @@ pub struct FlowMessageMetadata {
     pub id: String,
     pub retry: usize,
     pub offset: Option<i64>,
+}
+
+// TODO move it to kafka dir
+impl FlowMessageMetadata {
+    pub fn map_hdr<T>(r: Option<(&str, T)>, hdr: &str) -> Result<T, EventStreamError> {
+        match r {
+            Some((_h, v)) => Ok(v),
+            None => Err(EventStreamError::UnableToParseKafkaHeader(hdr.to_owned())),
+        }
+    }
 }
 
 #[derive(Message)]

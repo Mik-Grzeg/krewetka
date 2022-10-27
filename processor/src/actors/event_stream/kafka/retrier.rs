@@ -1,24 +1,42 @@
-use super::kafka::CustomContext;
-use super::reader::Transport;
-use actix::clock::{sleep_until, Instant};
-use rdkafka::{consumer::{Consumer, StreamConsumer}, producer::FutureRecord, Message};
-
-use super::consts::BASE_RETRY_INTERVAL_IN_SECS;
-
-use crate::actors::messages::{FlowMessageMetadata, FlowMessageWithMetadata};
+use super::super::transport::RetrierExt;
+use super::consts::*;
+use super::get_consumer;
+use super::get_producer;
+use crate::actors::messages::FlowMessageMetadata;
 use async_trait::async_trait;
-use log::error;
-use log::info;
-use log::warn;
-
-use super::kafka::KafkaState;
-use log::debug;
+use futures::StreamExt;
+use log::*;
+use rdkafka::consumer::Consumer;
+use rdkafka::message::Message;
 use rdkafka::message::OwnedHeaders;
-use std::sync::Arc;
-use tokio::time::Duration;
-use tokio_stream::StreamExt;
+use rdkafka::producer::FutureRecord;
+use tokio::time::{sleep_until, Duration, Instant};
 
-#[derive(Clone)]
+#[async_trait]
+impl RetrierExt for Retrier {
+    async fn spawn_retriers(&self) {
+        info!("Spawning retriers");
+        tokio::join!(
+            self.clone().run_retrier(1),
+            self.clone().run_retrier(2),
+            self.clone().run_retrier(3),
+        );
+    }
+
+    fn get_topic_based_on_retry(&self, current_retry: usize) -> Option<String> {
+        let max_retries = self.max_retries + 1;
+        match (current_retry == max_retries, current_retry > max_retries) {
+            (false, false) => Some(format!("{}{}", self.topic_retry, current_retry)),
+            (true, false) => Some(self.topic_dlq.to_owned()),
+            (_, true) => None,
+        }
+    }
+
+    fn get_brokers_retry(&self) -> &str {
+        &self.brokers
+    }
+}
+
 pub struct Retrier {
     topic_original: String,
     topic_retry: String,
@@ -57,17 +75,13 @@ impl Default for Retrier {
     }
 }
 
-pub struct ArcedRetrier(Arc<Retrier>);
-
-impl ArcedRetrier {
-    pub fn new(retrier: Arc<Retrier>) -> Self {
-        Self(retrier)
-    }
-
+impl Retrier {
     async fn run_retrier(&self, retry: usize) {
-        let consumer = KafkaState::get_consumer(&self.0.brokers);
-        let producer = KafkaState::get_producer(&self.0.brokers);
-        let destination_topic = match self.0.get_topic_based_on_retry(retry) {
+        info!("Starting mega retrier_{}", retry);
+        let consumer = get_consumer(&self.brokers);
+        let producer = get_producer(&self.brokers);
+
+        let destination_topic = match self.get_topic_based_on_retry(retry) {
             Some(s) => s,
             None => return,
         };
@@ -94,7 +108,7 @@ impl ArcedRetrier {
 
                         if let Err((e, _)) = producer
                             .send(
-                                FutureRecord::to(&self.0.topic_original)
+                                FutureRecord::to(&self.topic_original)
                                     .payload(ev.payload().unwrap())
                                     .key("KREWETKA")
                                     .headers(
@@ -123,40 +137,5 @@ impl ArcedRetrier {
                 }
             }
         }
-    }
-
-    pub async fn init_retry(&self) {
-        info!("Spawning retriers");
-        tokio::join!(
-            self.clone().run_retrier(1),
-            self.clone().run_retrier(2),
-            self.clone().run_retrier(3),
-        );
-    }
-}
-
-impl Retrier {
-    pub fn get_topic_based_on_retry(&self, current_retry: usize) -> Option<String> {
-        let max_retries = self.max_retries + 1;
-        match (current_retry == max_retries, current_retry > max_retries) {
-            (false, false) => Some(format!("{}{}", self.topic_retry, current_retry)),
-            (true, false) => Some(self.topic_dlq.to_owned()),
-            (_, true) => None,
-        }
-    }
-
-    pub fn get_brokers_retry(&self) -> &str {
-        &self.brokers
-    }
-}
-
-#[async_trait]
-impl Transport for Retrier {
-    async fn consume(&self, consumer: Arc<StreamConsumer<CustomContext>>, topic: String, _brokers: String) {
-        todo!()
-    }
-
-    async fn produce(&self, _topic: &str, _brokers: &str, _msg: &FlowMessageWithMetadata) {
-        todo!()
     }
 }
