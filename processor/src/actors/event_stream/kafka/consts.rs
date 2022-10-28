@@ -1,0 +1,2 @@
+pub const OFFSET_COMMIT_INTERVAL: u64 = 5;
+pub const BASE_RETRY_INTERVAL_IN_MILLIS: u64 = 60 * 10_u64.pow(3);

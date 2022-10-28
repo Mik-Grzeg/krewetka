@@ -1,9 +1,4 @@
 use std::time::Duration;
 
-pub const STORAGE_BUFFER_SIZE: usize = 100;
-pub const BASE_RETRY_STORAGE_INSERT_INTERVAL_IN_SECS: u64 = 3;
-pub const RETRY_STORAGE_INSERT_INTERVAL_IN_SECS: [Duration; 3] = [
-    Duration::from_secs(BASE_RETRY_STORAGE_INSERT_INTERVAL_IN_SECS),
-    Duration::from_secs(BASE_RETRY_STORAGE_INSERT_INTERVAL_IN_SECS.pow(2)),
-    Duration::from_secs(BASE_RETRY_STORAGE_INSERT_INTERVAL_IN_SECS.pow(3)),
-];
+pub const STORAGE_MAX_BUFFER_SIZE: usize = 1024 * 1024;
+pub const STORAGE_BUFFER_FLUSH_INTEVAL_IN_SECS: Duration = Duration::from_secs(15);

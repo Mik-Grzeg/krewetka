@@ -1,8 +1,8 @@
-mod consts;
+pub mod actor;
+pub mod errors;
 pub mod kafka;
-mod reader;
-mod topic;
+pub mod messages;
+pub mod transport;
 
-pub use reader::EventStreamActor;
-pub use reader::Transport;
-pub use topic::TopicOffsetKeeper;
+pub use actor::EventStreamActor;
+pub use transport::{RetrierExt, Transport};

@@ -23,6 +23,8 @@ sys-info = "0.9.1"
 prost = "0.10"
 tonic = "0.8.1"
 bytes = "1.2.1"
+uuid = { version = "1.2.1", features = ["v4", "fast-rng", "macro-diagnostics"] }
+chrono = "0.4.22"
 
 [build-dependencies]
 tonic-build = "0.8.0"

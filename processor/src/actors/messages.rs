@@ -1,7 +1,6 @@
 use crate::pb::FlowMessage;
-use chrono::DateTime;
-use chrono::Utc;
 
+use super::event_stream::errors::EventStreamError;
 use actix::Message;
 
 pub enum ProcessedFinished {
@@ -9,10 +8,35 @@ pub enum ProcessedFinished {
     Nack(i64),
 }
 
+#[derive(Message, Debug)]
+#[rtype(result = "()")]
+#[derive(Clone)]
+pub enum AckMessage {
+    Ack(i64),
+    NackRetry(FlowMessageWithMetadata),
+}
+
 #[derive(Message)]
 #[rtype(result = "Result<(), ()>")]
-pub struct MessageFromEventStream {
-    pub msg: FlowMessageWithMetadata,
+pub struct MessageFromEventStream(pub FlowMessageWithMetadata);
+
+#[derive(Clone, Debug)]
+pub struct FlowMessageMetadata {
+    pub timestamp: u64,
+    pub host: String,
+    pub id: String,
+    pub retry: usize,
+    pub offset: Option<i64>,
+}
+
+// TODO move it to kafka dir
+impl FlowMessageMetadata {
+    pub fn map_hdr<T>(r: Option<(&str, T)>, hdr: &str) -> Result<T, EventStreamError> {
+        match r {
+            Some((_h, v)) => Ok(v),
+            None => Err(EventStreamError::UnableToParseKafkaHeader(hdr.to_owned())),
+        }
+    }
 }
 
 #[derive(Message)]
@@ -20,66 +44,34 @@ pub struct MessageFromEventStream {
 #[derive(Clone, Debug)]
 pub struct FlowMessageWithMetadata {
     pub flow_message: FlowMessage,
-    pub timestamp: DateTime<Utc>,
-    pub host: String,
     pub malicious: Option<bool>,
-    pub id: i64,
+    pub metadata: FlowMessageMetadata,
 }
 
 #[derive(Message)]
 #[rtype(result = "()")]
 #[derive(Clone, Debug)]
-pub struct ClassifyFlowMessageWithMetadata {
-    pub flow_message: FlowMessage,
-    pub timestamp: DateTime<Utc>,
-    pub host: String,
-    pub malicious: Option<bool>,
-    pub id: i64,
-}
+pub struct ClassifyFlowMessageWithMetadata(pub FlowMessageWithMetadata);
 
 #[derive(Message)]
 #[rtype(result = "()")]
 #[derive(Clone, Debug)]
-pub struct PersistFlowMessageWithMetadata {
-    pub flow_message: FlowMessage,
-    pub timestamp: DateTime<Utc>,
-    pub host: String,
-    pub malicious: Option<bool>,
-    pub id: i64,
-}
+pub struct PersistFlowMessageWithMetadata(pub FlowMessageWithMetadata);
 
 impl From<FlowMessageWithMetadata> for ClassifyFlowMessageWithMetadata {
     fn from(original_flow_message: FlowMessageWithMetadata) -> Self {
-        Self {
-            flow_message: original_flow_message.flow_message,
-            timestamp: original_flow_message.timestamp,
-            host: original_flow_message.host,
-            malicious: original_flow_message.malicious,
-            id: original_flow_message.id,
-        }
+        Self(original_flow_message)
     }
 }
 
 impl From<ClassifyFlowMessageWithMetadata> for PersistFlowMessageWithMetadata {
     fn from(original_flow_message: ClassifyFlowMessageWithMetadata) -> Self {
-        Self {
-            flow_message: original_flow_message.flow_message,
-            timestamp: original_flow_message.timestamp,
-            host: original_flow_message.host,
-            malicious: original_flow_message.malicious,
-            id: original_flow_message.id,
-        }
+        Self(original_flow_message.0)
     }
 }
 
 impl From<PersistFlowMessageWithMetadata> for FlowMessageWithMetadata {
     fn from(original_flow_message: PersistFlowMessageWithMetadata) -> FlowMessageWithMetadata {
-        Self {
-            flow_message: original_flow_message.flow_message,
-            timestamp: original_flow_message.timestamp,
-            host: original_flow_message.host,
-            malicious: original_flow_message.malicious,
-            id: original_flow_message.id,
-        }
+        original_flow_message.0
     }
 }

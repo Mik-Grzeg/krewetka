@@ -1,26 +1,25 @@
 use crate::actors::classification_client_grpc::client::Classifier;
-use crate::actors::event_stream::kafka::OffsetGuard;
-use crate::actors::event_stream::TopicOffsetKeeper;
+use crate::actors::event_stream::kafka::retrier::Retrier;
+use crate::actors::event_stream::messages::{InitConsumer, InitRetrier};
+use crate::actors::event_stream::{kafka::KafkaProcessingAgent, EventStreamActor};
+use crate::actors::storage::messages::InitFlusher;
 use crate::actors::storage::storage_actor::StorageActor;
 
-use crate::actors::broker::Broker;
-use crate::actors::event_stream::{
-    kafka::{self, KafkaState},
-    Transport,
-};
-use crate::actors::storage::storage_actor;
+use actix::clock::sleep;
+
 use crate::actors::storage::{clickhouse::ClickhouseState, storage_actor::StorageError};
 use crate::consts::DEFAULT_ENV_VAR_PREFIX;
 use crate::pb::flow_message_classifier_client::FlowMessageClassifierClient;
 use crate::settings::ProcessorSettings;
 use actix::Actor;
+use actix_broker::Broker;
+use actix_broker::SystemBroker;
 
 use config::builder::DefaultState;
 use config::{Config, ConfigBuilder, Environment};
 use log::error;
-use std::sync::Mutex;
 
-use crate::actors::{classification_client_grpc, event_stream};
+use crate::actors::classification_client_grpc;
 
 use serde::Deserialize;
 use std::sync::Arc;
@@ -36,7 +35,7 @@ pub enum ConfigErr {
 
 pub struct ApplicationState {
     config: Config,
-    kafka_state: Arc<KafkaState>,
+    brokers: String,
     clickhouse_state: Arc<ClickhouseState>,
     classification_state: Classifier,
 }
@@ -58,10 +57,7 @@ impl ApplicationState {
             get_config::<ProcessorSettings>(&config).expect("Getting config failed");
 
         // set kafka settings
-        let kafka_state = Arc::new(kafka::KafkaState::new(
-            deserialized_config.kafka_topic,
-            deserialized_config.kafka_brokers,
-        ));
+        let brokers = deserialized_config.kafka_brokers;
         // set clickhouse settings
         let clickhouse_state = Arc::new(ClickhouseState::new(
             deserialized_config.clickhouse_settings,
@@ -74,7 +70,7 @@ impl ApplicationState {
 
         let state = ApplicationState {
             config,
-            kafka_state,
+            brokers,
             clickhouse_state,
             classification_state,
         };
@@ -108,46 +104,42 @@ impl ApplicationState {
             }
         });
 
-        // create wrapped actix broker
-        let actor_broker = Arc::new(Mutex::new(Broker));
-
         // init storage actor
-        let (storage_actor, recv) = StorageActor::new(self.clickhouse_state.clone());
-        storage_actor.start();
-
-        // spawn buffer flushing task
-        let flusher_storage_state = self.clickhouse_state.clone();
-        let flusher =
-            task::spawn(
-                async move { storage_actor::flush_buffer(flusher_storage_state, recv).await },
-            );
+        StorageActor::new(self.clickhouse_state.clone()).start();
 
         // init classification actor
+        let grpc_client =
+            match FlowMessageClassifierClient::connect(self.classification_state.dsn()).await {
+                Ok(c) => c,
+                Err(e) => {
+                    panic!("unable to connect with classification server: {:?}", e)
+                }
+            };
         classification_client_grpc::client::ClassificationActor {
-            client: FlowMessageClassifierClient::connect(format!(
-                "http://{}:{}",
-                self.classification_state.host, self.classification_state.port
-            ))
-            .await
-            .unwrap(),
-            broker: actor_broker.clone(),
+            client: grpc_client,
         }
         .start();
 
-        // start event streaming actor
-        event_stream::EventStreamActor {
-            channel: self.kafka_state.clone(),
-        }
-        .start();
+        // starting event stream actor
+        let processing_agent = Arc::new(KafkaProcessingAgent::new("flows", &self.brokers));
+        let retrier = Arc::new(Retrier::default());
 
-        // start task which gruards offset commits
-        let mut offset_guard = OffsetGuard::new(self.kafka_state.clone(), &self.kafka_state.topic);
-        let acker = task::spawn(async move { offset_guard.inc_offset().await });
+        let event_stream_actor = EventStreamActor::<KafkaProcessingAgent, Retrier> {
+            processor: processing_agent,
+            retrier,
+        };
 
-        // start consuming messages on kafka
-        self.kafka_state.consume().await;
+        event_stream_actor.start();
 
-        flusher.await;
-        acker.await;
+        task::spawn(async move {
+            Broker::<SystemBroker>::issue_async(InitRetrier);
+            Broker::<SystemBroker>::issue_async(InitFlusher {});
+            Broker::<SystemBroker>::issue_async(InitConsumer);
+        })
+        .await;
+
+        // TODO call healthcheck endpoint from here
+        // for now it will be sleep
+        sleep(Duration::from_secs(900)).await;
     }
 }
