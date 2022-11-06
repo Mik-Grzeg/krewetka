@@ -1,4 +1,4 @@
 **/target
-/deploy/charts/*
+/deploy/charts/*.tgz
 **/krewetka.yaml
 /venv

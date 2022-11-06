@@ -12,11 +12,13 @@ def producer():
     ZMQ_PRODUCER_PORT = os.environ["ZMQ_PRODUCER_PORT"]
     ZMQ_PRODUCER_ADDRESS = f'tcp://*:{ZMQ_PRODUCER_PORT}'
     print(f"{ZMQ_PRODUCER_ADDRESS}")
+    RPS = int(os.environ.get("RPS", 1000))
     context = zmq.Context()
     zmq_socket = context.socket(zmq.PUB)
     zmq_socket.bind(ZMQ_PRODUCER_ADDRESS)
 
 
+    counter = 0
     while True:
         src_ip = ".".join(map(str, (random.randint(0, 255) for _ in range(4))))
         dst_ip = ".".join(map(str, (random.randint(0, 255) for _ in range(4))))
@@ -35,10 +37,11 @@ def producer():
             FLOW_DURATION_MILLISECONDS = random.randint(0, 100000),
         )
 
-        print(f"{msg}")
         work_message = [b"flows", bytes(json.dumps(msg), encoding='utf-8')]
         zmq_socket.send_multipart(work_message)
-        print(f"Sent message: {work_message}")
-        time.sleep(random.uniform(0,2))
+        
+        if counter % RPS == 0:
+            time.sleep(1)
+
 if __name__ == '__main__':
     producer()
