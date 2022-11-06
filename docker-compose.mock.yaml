@@ -1,0 +1,22 @@
+version: "3.9"
+services:
+
+  importer:
+    build: ./dummy-importer
+    ports:
+      - "5561:5561"
+
+  collector:
+    build:
+      dockerfile: ./collector/Dockerfile
+    depends_on:
+      - importer
+    environment:
+      KREWETKA__IMPORTER__SOURCE: "zmq"
+      KREWETKA__IMPORTER__SETTINGS__ZMQ_ADDRESS: "127.0.0.1:5561"
+      KREWETKA__IMPORTER__SETTINGS__ZMQ_QUEUE_NAME: "flow"
+      KREWETKA__EXPORTER__DESTINATION: "kafka"
+      KREWETKA__EXPORTER__SETTINGS__KAFKA_BROKERS: ${KAFKA_BROKERS}
+      KREWETKA__EXPORTER__SETTINGS__KAFKA_TOPIC: "flows"
+    network_mode: host
+

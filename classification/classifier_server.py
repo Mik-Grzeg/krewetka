@@ -1,5 +1,6 @@
 from proto import flow_pb2_grpc
 from proto import flow_pb2
+import os
 import random
 import grpc
 from concurrent import futures
@@ -49,19 +50,19 @@ class Classifier:
             msg.FlowDurationMilliseconds
         ]])
 
-def serve():
-    print('serving')
+def serve(port):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     flow_pb2_grpc.add_FlowMessageClassifierServicer_to_server(
         FlowMessageClassifierServicer(), server
     )
 
-    server.add_insecure_port('[::]:50051')
+    server.add_insecure_port(f'[::]:{port}')
     server.start()
 
-    print('started listening on: [::]:50051')
+    print(f'started listening on: [::]:{port}')
     server.wait_for_termination()
 
 if __name__ == '__main__':
 
-    serve()
+    port = int(os.environ.get("GRPC_SERVER_PORT", 50051))
+    serve(port)

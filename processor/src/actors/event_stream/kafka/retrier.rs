@@ -54,19 +54,10 @@ pub struct Retrier {
 }
 
 impl Retrier {
-    pub fn new(
-        topic_original: String,
-        topic_retry: String,
-        topic_dlq: String,
-        max_retries: usize,
-        brokers: String,
-    ) -> Self {
+    pub fn new(brokers: String) -> Self {
         Self {
-            topic_original,
-            topic_retry,
-            topic_dlq,
-            max_retries,
             brokers,
+            ..Self::default()
         }
     }
 }

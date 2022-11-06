@@ -100,7 +100,7 @@ impl ApplicationState {
         .start();
 
         let processing_agent = Arc::new(KafkaProcessingAgent::new("flows", &self.brokers));
-        let retrier = Arc::new(Retrier::default());
+        let retrier = Arc::new(Retrier::new(self.brokers.clone()));
 
         let event_stream_actor = EventStreamActor::new(processing_agent, retrier, broker);
 
