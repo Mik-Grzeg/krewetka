@@ -1,15 +1,13 @@
 use rdkafka::Message;
 use std::fmt;
 
-use std::time::{Duration, Instant};
-
 use async_trait::async_trait;
 use chrono::Utc;
-use log::info;
-use log::{debug, error};
+
+use log::error;
 use rdkafka::config::ClientConfig;
 use rdkafka::message::OwnedHeaders;
-use rdkafka::producer::{FutureProducer, FutureRecord};
+use rdkafka::producer::{BaseRecord, DefaultProducerContext, ThreadedProducer};
 use uuid::Uuid;
 
 use super::errors::ExporterError;
@@ -29,7 +27,7 @@ impl KafkaSettings {
 
 pub struct KafkaExporter {
     settings: KafkaSettings,
-    producer: FutureProducer,
+    producer: ThreadedProducer<DefaultProducerContext>,
 }
 
 impl fmt::Debug for KafkaExporter {
@@ -39,11 +37,11 @@ impl fmt::Debug for KafkaExporter {
 }
 impl KafkaExporter {
     pub fn new(settings: KafkaSettings) -> Result<KafkaExporter, ExporterError> {
-        let producer: FutureProducer = ClientConfig::new()
+        let producer: ThreadedProducer<DefaultProducerContext> = ClientConfig::new()
             .set("bootstrap.servers", settings.get_brokers_kafka_format())
             .set("message.timeout.ms", "5000")
-            .set("queue.buffering.max.ms", "0.1")
-            .set("queue.buffering.max.messages", "1000")
+            // .set("queue.buffering.max.ms", "10")
+            // .set("queue.buffering.max.messages", "1000")
             .create()
             .expect("Producer creation error");
 
@@ -55,9 +53,10 @@ impl KafkaExporter {
 impl Export for KafkaExporter {
     async fn export(&self, msg: &[u8], identifier: &str) -> Result<(), ExporterError> {
         // send event to kafka
-        let record = FutureRecord::to(&self.settings.topic)
+        let key = format!("KREWETKA-{}", &Uuid::new_v4().to_string());
+        let record = BaseRecord::to(&self.settings.topic)
             .payload(msg)
-            .key("KREWETKA")
+            .key(&key)
             .headers(
                 OwnedHeaders::new()
                     .add::<str>("host-identifier-x", identifier)
@@ -66,25 +65,9 @@ impl Export for KafkaExporter {
                     .add::<str>("retry-x", &0.to_string()), // .add::<bool>("proto-encoding-x", true)
             );
 
-        let result = self.producer.send(record, Duration::from_secs(0)).await;
-
-        // describe if it was successfull
-        match result {
-            Ok((partition, offset)) => {
-                debug!(
-                    "Event saved at partition: {}\toffset: {}",
-                    partition, offset
-                );
-                Ok(())
-            }
-            Err((kafka_err, owned_msg)) => {
-                error!(
-                    "Unable to send message: {}\nPayload: {:?}",
-                    kafka_err,
-                    owned_msg.payload()
-                );
-                Err(ExporterError::from((kafka_err, owned_msg)))
-            }
-        }
+        self.producer.send(record).map_err(|(e, record)| {
+            error!("Unable to send message: {}\nPayload: {:?}", e, record);
+            ExporterError::from(e)
+        })
     }
 }
