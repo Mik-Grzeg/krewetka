@@ -10,6 +10,7 @@ use chrono::{Duration as ChronoDuration, Utc};
 use futures::StreamExt;
 use log::*;
 use rdkafka::consumer::Consumer;
+use rdkafka::error::KafkaError;
 use tokio::task;
 use tokio::time::sleep;
 use tokio::time::Duration;
@@ -126,6 +127,11 @@ impl Retrier {
                         )
                         .num_minutes();
                         if deadline > 0 {
+                            warn!(
+                                "retry {} sleeping {} seconds",
+                                destination_topic,
+                                deadline as u64 * 60
+                            );
                             sleep(Duration::from_secs(deadline as u64 * 60)).await;
                         }
 
@@ -157,12 +163,15 @@ impl Retrier {
                         }
                     }
                 }
-                Err(e) => {
-                    warn!(
+                Err(e) => match e {
+                    KafkaError::OffsetFetch(
+                        rdkafka::types::RDKafkaErrorCode::UnknownTopicOrPartition,
+                    ) => continue,
+                    _ => warn!(
                         "Unable to receive failed message from topic: {}\n{}",
                         destination_topic, e
-                    )
-                }
+                    ),
+                },
             }
         }
         guard_fut.await.unwrap();
