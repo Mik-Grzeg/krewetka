@@ -1,12 +1,12 @@
-use rdkafka::{error::KafkaError, message::OwnedMessage};
+use rdkafka::error::KafkaError;
 
 #[derive(Debug)]
 pub enum ExporterError {
-    KafkaErr((KafkaError, OwnedMessage)),
+    KafkaErr(KafkaError),
 }
 
-impl From<(KafkaError, OwnedMessage)> for ExporterError {
-    fn from(error: (KafkaError, OwnedMessage)) -> ExporterError {
+impl From<KafkaError> for ExporterError {
+    fn from(error: KafkaError) -> ExporterError {
         ExporterError::KafkaErr(error)
     }
 }

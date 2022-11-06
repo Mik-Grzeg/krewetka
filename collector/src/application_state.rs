@@ -93,7 +93,7 @@ impl ApplicationState {
             .expect("unable to initialize importer");
 
         // make a shared channel for common data
-        let (tx, mut rx) = mpsc::channel::<Vec<u8>>(20);
+        let (tx, mut rx) = mpsc::channel::<Vec<u8>>(1024);
 
         let tx1 = tx.clone();
 

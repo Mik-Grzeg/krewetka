@@ -2,7 +2,10 @@ use super::errors::ExporterError;
 use crate::application_state::HostIdentifier;
 use async_trait::async_trait;
 use log::{debug, info};
+use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc::Receiver;
+use tokio::task;
+use tokio::time::Duration;
 
 #[async_trait]
 pub trait Export: Sync + Send {
@@ -13,12 +16,29 @@ pub async fn run(exporter: impl Export, rx: &mut Receiver<Vec<u8>>, identifier: 
     info!("Spawned exporter...");
     let identifier = &String::from(identifier);
 
+    let current = Arc::new(Mutex::new(0));
+    let current_clone = current.clone();
+    let timer = task::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(10));
+
+        loop {
+            interval.tick().await;
+            let mut current = current_clone.lock().unwrap();
+            info!("RPS: {}", *current / 10);
+            *current = 0;
+        }
+    });
+
     while let Some(m) = rx.recv().await {
-        if let Err(_) = exporter.export(&m, identifier).await {
+        if exporter.export(&m, identifier).await.is_err() {
             debug!("Exporter is losing messages...");
+        } else {
+            let mut counter = current.lock().unwrap();
+            *counter += 1;
         }
     }
 
+    timer.await;
     info!("Closing exporter...");
 }
 
