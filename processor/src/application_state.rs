@@ -1,31 +1,27 @@
+use crate::actors::broker::Broker;
 use crate::actors::classification_client_grpc::client::Classifier;
+
 use crate::actors::event_stream::kafka::retrier::Retrier;
-use crate::actors::event_stream::messages::{InitConsumer, InitRetrier};
+
 use crate::actors::event_stream::{kafka::KafkaProcessingAgent, EventStreamActor};
-use crate::actors::storage::messages::InitFlusher;
+
 use crate::actors::storage::storage_actor::StorageActor;
 
-use actix::clock::sleep;
+use tokio::sync::Mutex as TokioMtx;
 
-use crate::actors::storage::{clickhouse::ClickhouseState, storage_actor::StorageError};
+use crate::actors::storage::clickhouse::ClickhouseState;
 use crate::consts::DEFAULT_ENV_VAR_PREFIX;
 use crate::pb::flow_message_classifier_client::FlowMessageClassifierClient;
 use crate::settings::ProcessorSettings;
 use actix::Actor;
-use actix_broker::Broker;
-use actix_broker::SystemBroker;
 
 use config::builder::DefaultState;
 use config::{Config, ConfigBuilder, Environment};
-use log::error;
 
 use crate::actors::classification_client_grpc;
 
 use serde::Deserialize;
 use std::sync::Arc;
-
-use tokio::task;
-use tokio::time::{interval, Duration};
 
 #[derive(Debug)]
 pub enum ConfigErr {
@@ -79,33 +75,15 @@ impl ApplicationState {
     }
 
     pub async fn init_actors(&self) {
-        // Clickhouse health check
-        let mut ping_interval = interval(Duration::from_secs(15));
-
         // deserialize env config
         let _deserialized_config =
             get_config::<ProcessorSettings>(&self.config).expect("Getting config failed");
 
-        let mut client = self
-            .clickhouse_state
-            .pool
-            .as_ref()
-            .get_handle()
-            .await
-            .map_err(|e| StorageError::Database(Box::new(e)))
-            .unwrap();
-
-        task::spawn(async move {
-            loop {
-                if let Err(e) = client.ping().await {
-                    error!("Ping does pong: {}", e)
-                };
-                ping_interval.tick().await;
-            }
-        });
+        // starting event stream actor
+        let broker = Arc::new(TokioMtx::new(Broker));
 
         // init storage actor
-        StorageActor::new(self.clickhouse_state.clone()).start();
+        StorageActor::new(self.clickhouse_state.clone(), broker.clone()).start();
 
         // init classification actor
         let grpc_client =
@@ -115,31 +93,17 @@ impl ApplicationState {
                     panic!("unable to connect with classification server: {:?}", e)
                 }
             };
+
         classification_client_grpc::client::ClassificationActor {
             client: grpc_client,
         }
         .start();
 
-        // starting event stream actor
         let processing_agent = Arc::new(KafkaProcessingAgent::new("flows", &self.brokers));
         let retrier = Arc::new(Retrier::default());
 
-        let event_stream_actor = EventStreamActor::<KafkaProcessingAgent, Retrier> {
-            processor: processing_agent,
-            retrier,
-        };
+        let event_stream_actor = EventStreamActor::new(processing_agent, retrier, broker);
 
         event_stream_actor.start();
-
-        task::spawn(async move {
-            Broker::<SystemBroker>::issue_async(InitRetrier);
-            Broker::<SystemBroker>::issue_async(InitFlusher {});
-            Broker::<SystemBroker>::issue_async(InitConsumer);
-        })
-        .await;
-
-        // TODO call healthcheck endpoint from here
-        // for now it will be sleep
-        sleep(Duration::from_secs(900)).await;
     }
 }

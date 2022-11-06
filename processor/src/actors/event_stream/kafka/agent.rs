@@ -2,20 +2,27 @@ use super::super::Transport;
 use super::context::CustomContext;
 use super::get_consumer;
 use super::get_producer;
-use super::offset_guard::get_current_offset;
+
 use super::offset_guard::ConsumerOffsetGuard;
+
+use crate::actors::broker::Broker;
+
 use crate::actors::messages::{FlowMessageMetadata, FlowMessageWithMetadata};
 use crate::pb::FlowMessage;
-use actix_broker::{Broker, SystemBroker};
+
+use tokio::sync::mpsc;
+
 use async_trait::async_trait;
-use log::{debug, error, info, warn};
+use log::{debug, error, info};
 use prost::Message as PBMessage;
 use rdkafka::consumer::{Consumer, StreamConsumer};
 use rdkafka::message::{Message, OwnedHeaders, OwnedMessage};
 use rdkafka::producer::FutureProducer;
 use rdkafka::producer::FutureRecord;
-use rdkafka::Offset;
+use tokio::sync::Mutex as TokioMtx;
+
 use std::sync::Arc;
+
 use tokio::time::{sleep, Duration};
 
 pub struct KafkaProcessingAgent {
@@ -34,6 +41,7 @@ impl KafkaProcessingAgent {
             .unwrap_or_else(|_| panic!("Unable to subscribe to topic {}", consumer_topic));
 
         let consumer_guard = ConsumerOffsetGuard::new(&consumer, consumer_topic);
+        info!("created kafka processing agent");
 
         Self {
             producer,
@@ -42,7 +50,7 @@ impl KafkaProcessingAgent {
         }
     }
 
-    async fn send_to_actor(msg: OwnedMessage) {
+    async fn send_to_actor(msg: OwnedMessage, broker: &Arc<TokioMtx<Broker>>) {
         let hdrs = msg.headers().unwrap(); // TODO make headers as From<OwnedHeaders> for
                                            // FlowMessageMetadata
         let mut metadata: FlowMessageMetadata = hdrs.try_into().unwrap();
@@ -62,7 +70,7 @@ impl KafkaProcessingAgent {
                     "Deserialized kafka event: {:?}",
                     msg_with_metadata.flow_message
                 );
-                Broker::<SystemBroker>::issue_async::<FlowMessageWithMetadata>(msg_with_metadata);
+                broker.lock().await.issue_async(msg_with_metadata);
             }
             Some(Err(e)) => {
                 error!("Unable to decode kafka even into flow message: {:?}", e);
@@ -83,40 +91,29 @@ impl Transport for KafkaProcessingAgent {
         self.consumer_guard.stash_processed_offset(offset)
     }
 
-    async fn consume(&self) {
+    async fn consume(&self, broker: Arc<TokioMtx<Broker>>, mut notify_rx: mpsc::Receiver<usize>) {
         info!(
             "Starting to consume messages from kafka [topic: {}]",
             self.consumer_guard.topic
         );
 
-        let partition = 0;
-        let starting_offset = match get_current_offset(&self.consumer, &self.consumer_guard.topic) {
-            Offset::Invalid => Offset::from_raw(0),
-            offset => offset,
-        };
+        let mut counter: usize = 0;
+        while let Some(capacity) = notify_rx.recv().await {
+            info!("Received capacity: {}", capacity);
+            while counter < capacity {
+                let event = match self.consumer.recv().await {
+                    Ok(e) => e,
+                    Err(e) => {
+                        error!("Error: {}", e);
+                        sleep(Duration::from_secs(4)).await;
+                        continue;
+                    }
+                };
 
-        if let Err(e) = self.consumer.seek(
-            &self.consumer_guard.topic,
-            partition,
-            starting_offset,
-            Duration::from_secs(3),
-        ) {
-            warn!(
-                "unable to seek offset {:?} in topic {} on partition {} with error: {}",
-                starting_offset, self.consumer_guard.topic, partition, e
-            );
-        }
-
-        loop {
-            let event = match self.consumer.recv().await {
-                Ok(e) => e,
-                Err(e) => {
-                    error!("Error: {}", e);
-                    sleep(Duration::from_secs(4)).await;
-                    continue;
-                }
-            };
-            Self::send_to_actor(event.detach()).await;
+                Self::send_to_actor(event.detach(), &broker).await;
+                counter += 1;
+            }
+            counter = 0;
         }
     }
 

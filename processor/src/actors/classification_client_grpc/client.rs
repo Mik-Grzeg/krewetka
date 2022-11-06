@@ -14,7 +14,8 @@ use log::error;
 use tokio_stream::{Stream, StreamExt};
 use tonic::transport::Channel;
 
-use log::info;
+use super::super::consts::MAILBOX_CAPACITY;
+use log::{debug, info};
 
 pub struct ClassificationActor {
     pub client: FlowMessageClassifierClient<Channel>,
@@ -25,6 +26,7 @@ impl Actor for ClassificationActor {
 
     fn started(&mut self, ctx: &mut Self::Context) {
         info!("Started  classification actor");
+        ctx.set_mailbox_capacity(MAILBOX_CAPACITY);
         self.subscribe_async::<BrokerType, ClassifyFlowMessageWithMetadata>(ctx)
     }
 }
@@ -40,6 +42,7 @@ impl Handler<ClassifyFlowMessageWithMetadata> for ClassificationActor {
         let mut client = self.client.clone();
         let mut msg = msg;
 
+        debug!(target: "events_to_classify", "Got event: {}", msg.0.metadata.offset.unwrap());
         Box::pin(async move {
             match client.classify(msg.0.flow_message.clone()).await {
                 Ok(b) => {
@@ -82,8 +85,6 @@ pub fn classifier_requests_iter() -> impl Stream<Item = FlowMessage> {
         tcp_flags: 11,
     })
 }
-
-// pub async fn batched_classifier()
 
 pub async fn streaming_classifier(
     rx: &mut tokio::sync::broadcast::Receiver<FlowMessageWithMetadata>,

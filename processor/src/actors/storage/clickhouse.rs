@@ -8,7 +8,7 @@ use clickhouse_rs::{row, types::Block, Pool};
 use futures::stream::StreamExt;
 use std::time::Duration;
 
-use log::{error, info};
+use log::error;
 use serde::Deserialize;
 
 use crate::actors::messages::FlowMessageWithMetadata;
@@ -52,7 +52,7 @@ impl ClickhouseState {
         Self { settings, pool }
     }
 
-    fn push_to_block(block: &mut Block, f: FlowMessageWithMetadata) -> AckMessage {
+    fn push_to_block(block: &mut Block, f: &FlowMessageWithMetadata) -> AckMessage {
         match block.push(row! {
            host: f.metadata.host.as_str(),
            out_bytes: f.flow_message.out_bytes,
@@ -70,7 +70,7 @@ impl ClickhouseState {
            timestamp:      Utc.timestamp(f.metadata.timestamp as i64, 0),
         }) {
             Ok(()) => AckMessage::Ack(f.metadata.offset.unwrap()),
-            Err(_e) => AckMessage::NackRetry(f),
+            Err(_e) => AckMessage::NackRetry(f.to_owned()),
         }
     }
 }
@@ -106,18 +106,19 @@ impl AStorage for ClickhouseState {
         let mut block = Block::with_capacity(msgs.len());
 
         let acks = msgs
-            .into_iter()
+            .iter()
             .map(|f| ClickhouseState::push_to_block(&mut block, f))
             .collect::<Vec<AckMessage>>();
 
         match client.insert("messages", block).await {
-            Ok(()) => {
-                info!("saved {} messages to storage", acks.len());
-                Ok(acks)
-            }
+            Ok(()) => Ok(acks),
             Err(e) => {
                 error!("unable to insert messages to clickhouse: {}", e);
-                Err(StorageError::DatabaseSave((Box::new(e), acks)))
+                let nacks = msgs
+                    .into_iter()
+                    .map(AckMessage::NackRetry)
+                    .collect::<Vec<AckMessage>>();
+                Err(StorageError::DatabaseSave((Box::new(e), nacks)))
             }
         }
     }

@@ -1,6 +1,7 @@
 use rdkafka::consumer::CommitMode;
 use rdkafka::consumer::Consumer;
 use rdkafka::consumer::StreamConsumer;
+use rdkafka::error::{KafkaError, RDKafkaErrorCode};
 use std::collections::BinaryHeap;
 use std::sync::{Arc, Mutex};
 
@@ -15,19 +16,21 @@ pub fn get_current_offset(consumer: &StreamConsumer<CustomContext>, topic: &str)
     let mut tpl = TopicPartitionList::new();
     let _ = tpl.add_partition(topic, 0);
 
-    for i in 0..3 {
-        info!("Offset checking iteration {}", i);
-        match consumer.committed_offsets(tpl.clone(), Duration::from_secs(3)) {
-            Ok(list) => {
-                let topic_map = list.to_topic_map();
-                return topic_map.get(&(topic.to_owned(), 0)).unwrap().to_owned();
+    match consumer.committed_offsets(tpl.clone(), Duration::from_secs(10)) {
+        Ok(list) => {
+            let topic_map = list.to_topic_map();
+            topic_map.get(&(topic.to_owned(), 0)).unwrap().to_owned()
+        }
+        Err(err) => {
+            error!("mega error while checking offset: {}", err);
+            match err {
+                KafkaError::OffsetFetch(RDKafkaErrorCode::UnknownTopicOrPartition) => {
+                    Offset::Beginning
+                }
+                _ => Offset::Invalid,
             }
-            Err(_err) => {
-                std::thread::sleep(Duration::from_secs(3));
-            }
-        };
+        }
     }
-    panic!("Could not get offset for topic");
 }
 
 pub struct ConsumerOffsetGuard {
@@ -59,7 +62,7 @@ impl ConsumerOffsetGuard {
 
     fn peek_heap(&self, peek: &Option<&i64>, last_stored_offset: &i64) -> bool {
         match *peek {
-            Some(x) => matches!(x * -1 - last_stored_offset, 1 | 0),
+            Some(x) => 1 >= (x * -1 - last_stored_offset),
             None => false,
         }
     }
@@ -75,7 +78,6 @@ impl ConsumerOffsetGuard {
         loop {
             sleep(Duration::from_secs(2)).await;
 
-            info!("[{}] Heap :{:?}", self.topic, heap.lock().unwrap());
             let mut heap_peek = heap.lock().unwrap();
 
             let mut last_stored_offset = self.last_stored_offset.lock().unwrap();
@@ -91,17 +93,15 @@ impl ConsumerOffsetGuard {
     fn store_offset(&self, offset: i64, consumer: &StreamConsumer<CustomContext>) {
         let mut tpl = TopicPartitionList::new();
 
+        debug!("Offset to store: {}", offset);
         if let Err(e) = tpl.add_partition_offset(&self.topic, 0, Offset::from_raw(offset)) {
             error!("Something odd for the topic partition offset: {}", e);
         };
 
-        match consumer.commit(&tpl, CommitMode::Sync) {
-            Err(e) => {
-                error!("unable to store offset: {}", e);
-            }
-            Ok(_ok) => {
-                debug!("stored offset: {} for topic {}", offset, &self.topic);
-            }
+        if let Err(KafkaError::OffsetFetch(RDKafkaErrorCode::UnknownTopicOrPartition)) =
+            consumer.commit(&tpl, CommitMode::Sync)
+        {
+            debug!(" unable to commit because topic or partition does not exists");
         }
     }
 }
