@@ -10,7 +10,7 @@ processor:
     initialDelaySeconds: 3
     periodSeconds: 3
   migrationJob:
-    restartPolicy: Never
+    restartPolicy: OnFailure
     backoffLimit: 5
     image:
     version: 0.0.1

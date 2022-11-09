@@ -84,12 +84,12 @@ impl Retrier {
             None => return,
         };
 
-        let offset_guard = Arc::new(ConsumerOffsetGuard::new(&consumer, &destination_topic));
+        let offset_guard = Arc::new(ConsumerOffsetGuard::new(consumer.clone(), &destination_topic));
 
         let offset_clone = offset_guard.clone();
         let cons_clone = consumer.clone();
         let guard_fut = task::spawn(async move {
-            offset_clone.inc_offset(&cons_clone).await;
+            offset_clone.inc_offset(cons_clone).await;
         });
 
         if let Err(e) = consumer.subscribe(&[&destination_topic]) {

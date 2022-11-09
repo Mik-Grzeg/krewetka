@@ -29,5 +29,5 @@ spec:
                 key: KREWETKA__CLICKHOUSE_SETTINGS__PORT
 
       restartPolicy: {{ .Values.processor.migrationJob.restartPolicy | quote }}
-  backoffLimit: {{ .Values.processor.migrationJob.backoffLimit }}
+  # backoffLimit: {{ .Values.processor.migrationJob.backoffLimit }}
 

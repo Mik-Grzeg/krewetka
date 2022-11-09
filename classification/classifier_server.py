@@ -1,5 +1,6 @@
 from proto import flow_pb2_grpc
 from proto import flow_pb2
+import logging
 import os
 import random
 import grpc
@@ -9,10 +10,14 @@ from sklearn.tree import DecisionTreeClassifier
 
 class FlowMessageClassifierServicer(flow_pb2_grpc.FlowMessageClassifierServicer):
 
+    def __init__(self):
+        self.model = Classifier()
+        super().__init__()
+
     def ClassifyStreaming(self, request_iterator, context):
         print('mega printa')
         for msg in request_iterator:
-            result = Classifier.classify(msg)
+            result = self.model.classify(msg)
 
             if result[0] == 1:
                 result = True
@@ -22,7 +27,7 @@ class FlowMessageClassifierServicer(flow_pb2_grpc.FlowMessageClassifierServicer)
             yield flow_pb2.FlowMessageClass(malicious = result)
 
     def Classify(self, request, context):
-        result = Classifier.classify(request)
+        result = self.model.classify(request)
 
         if result[0] == 1:
             result = True
@@ -35,9 +40,8 @@ class FlowMessageClassifierServicer(flow_pb2_grpc.FlowMessageClassifierServicer)
 class Classifier:
     model = pickle.load(open('flow-or-malicious.model', 'rb'))
 
-    @classmethod
-    def classify(__cls__, msg: flow_pb2.FlowMessage):
-        return __cls__.model.predict([[
+    def classify(self, msg: flow_pb2.FlowMessage):
+        return Classifier.model.predict([[
             msg.L4SrcPort,
             msg.L4DstPort,
             msg.Protocol,
@@ -57,12 +61,13 @@ def serve(port):
     )
 
     server.add_insecure_port(f'[::]:{port}')
-    server.start()
+    logging.info(f'started listening on: [::]:{port}')
 
-    print(f'started listening on: [::]:{port}')
+    server.start()
     server.wait_for_termination()
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG)
 
     port = int(os.environ.get("GRPC_SERVER_PORT", 50051))
     serve(port)

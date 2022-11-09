@@ -1,7 +1,11 @@
+use actix_web::cookie::time::format_description::modifier::OffsetSecond;
 use rdkafka::consumer::CommitMode;
 use rdkafka::consumer::Consumer;
 use rdkafka::consumer::StreamConsumer;
+use rdkafka::error::KafkaResult;
 use rdkafka::error::{KafkaError, RDKafkaErrorCode};
+use rdkafka::topic_partition_list;
+use rdkafka::topic_partition_list::TopicPartitionListElem;
 use std::collections::BinaryHeap;
 use std::sync::{Arc, Mutex};
 
@@ -12,7 +16,19 @@ use super::context::CustomContext;
 use log::*;
 use tokio::time::{sleep, Duration};
 
-pub fn get_current_offset(consumer: &StreamConsumer<CustomContext>, topic: &str) -> Offset {
+pub fn get_current_offset(consumer: &Arc<StreamConsumer<CustomContext>>, topic: &str) -> Offset {
+    // match consumer.assignment() {
+    //     Ok(a) => {
+    //         info!("assigments for topic {topic}: {a:?}");
+    //         match a.elements_for_topic(topic).first() {
+    //             Some(e) =>  e.offset(),
+    //             _ => continue
+    //         }
+    //     }
+    //     _ => continue
+    // }
+
+
     let mut tpl = TopicPartitionList::new();
     let _ = tpl.add_partition(topic, 0);
 
@@ -40,18 +56,18 @@ pub struct ConsumerOffsetGuard {
 }
 
 impl ConsumerOffsetGuard {
-    pub fn new(consumer: &StreamConsumer<CustomContext>, topic: &str) -> Self {
+    pub fn new(consumer: Arc<StreamConsumer<CustomContext>>, topic: &str) -> Self {
         let heap: Arc<Mutex<BinaryHeap<i64>>> = Arc::new(Mutex::new(BinaryHeap::new()));
 
-        let last_stored_offset = match get_current_offset(consumer, topic) {
-            Offset::Invalid => 0,
-            Offset::Offset(x) => x,
-            c => panic!("unknown offset: {:?}", c),
-        };
+        // let last_stored_offset = match get_current_offset(&consumer, topic) {
+        //     Offset::Invalid => 0,
+        //     Offset::Offset(x) => x,
+        //     c => panic!("unknown offset: {:?}", c),
+        // };
 
         Self {
             processed_offsets: heap,
-            last_stored_offset: Mutex::new(last_stored_offset),
+            last_stored_offset: Mutex::new(0),
             topic: topic.to_owned(),
         }
     }
@@ -67,7 +83,52 @@ impl ConsumerOffsetGuard {
         }
     }
 
-    pub async fn inc_offset(&self, consumer: &StreamConsumer<CustomContext>) {
+    async fn tt<'a>(&self, consumer: &Arc<StreamConsumer<CustomContext>>) {
+        let mut ready = false;
+
+        while !ready {
+            sleep(Duration::from_secs(2)).await;
+            // let mut c: TopicPartitionList;
+            // let mut partition: Vec<TopicPartitionListElem>;
+
+            let c = match consumer.committed(rdkafka::util::Timeout::Never) {
+                Ok(l) => l,
+                Err(_) => {
+                    warn!("continued at consumer.committed()");
+                    continue
+                }
+            };
+            let partition = c.elements_for_topic(&self.topic);
+
+
+            // partition = c.elements_for_topic(&self.topic);
+
+            if partition.first().is_none() {
+                warn!("continued at partition.first() for topic {}", self.topic);
+                continue;
+            }
+
+            for elem in partition.iter() {
+                info!("partition for [{}]: {:?} with offset {:?}", self.topic, elem.partition(), elem.offset());
+            }
+            let partition1 = partition.into_iter().nth(0).unwrap();
+
+            {
+                let mut last_stored_offset = self.last_stored_offset.lock().unwrap();
+                let fetched_offset = partition1.offset();
+
+                info!("Fetched offset: {fetched_offset:?}");
+                *last_stored_offset = match fetched_offset {
+                    Offset::Offset(o) => o,
+                    Offset::Invalid => 0,
+                    o => panic!("Unexpected offset {:?} for {}/{}", o, self.topic, partition1.partition())
+                }
+            }
+            ready = true;
+        }
+    }
+
+    pub async fn inc_offset(&self, consumer: Arc<StreamConsumer<CustomContext>>) {
         let heap = self.processed_offsets.clone();
         info!(
             "Spawned offset incrementer for {} with current offset {:?}",
@@ -75,9 +136,13 @@ impl ConsumerOffsetGuard {
             self.last_stored_offset.lock().unwrap()
         );
 
+        self.tt(&consumer).await;
+
         loop {
+
             sleep(Duration::from_secs(2)).await;
 
+            info!("{:?}", heap.lock().unwrap());
             let mut heap_peek = heap.lock().unwrap();
 
             let mut last_stored_offset = self.last_stored_offset.lock().unwrap();
@@ -86,14 +151,16 @@ impl ConsumerOffsetGuard {
             }
 
             // make it into a stream with a timeout to commit
-            self.store_offset(*last_stored_offset, consumer)
+            self.store_offset(*last_stored_offset, &consumer)
         }
     }
 
-    fn store_offset(&self, offset: i64, consumer: &StreamConsumer<CustomContext>) {
+    fn store_offset(&self, offset: i64, consumer: &Arc<StreamConsumer<CustomContext>>) {
         let mut tpl = TopicPartitionList::new();
 
-        debug!("Offset to store: {}", offset);
+        let assignment = consumer.assignment().unwrap();
+        info!("assignment: {:?}", assignment);
+        info!("Offset to store: {} for topic {}", offset, self.topic);
         if let Err(e) = tpl.add_partition_offset(&self.topic, 0, Offset::from_raw(offset)) {
             error!("Something odd for the topic partition offset: {}", e);
         };

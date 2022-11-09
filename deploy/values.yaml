@@ -1,4 +1,19 @@
 kafka:
+  provisioning:
+    numPartitions: 2
+    replicationFactor: 1
+    enabled: true
+    topics: 
+      - name: flows
+        replicationFactor: 1
+      - name: flows_retry_1
+        replicationFactor: 1
+      - name: flows_retry_2
+        replicationFactor: 1
+      - name: flows_dead_letter_queue
+        replicationFactor: 1
+
+    parallel: 5
   externalAccess:
     enabled: true
     service:
