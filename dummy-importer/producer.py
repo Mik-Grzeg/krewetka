@@ -42,6 +42,7 @@ def producer():
         
         if counter % RPS == 0:
             time.sleep(1)
+        counter += 1
 
 if __name__ == '__main__':
     producer()

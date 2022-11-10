@@ -176,8 +176,8 @@ where
 
         Box::pin(async move {
             match msg {
-                AckMessage::Ack(offset) => {
-                    processor.ack(offset);
+                AckMessage::Ack(offset, partition) => {
+                    processor.ack(offset, partition);
                 }
                 AckMessage::NackRetry(mut msg) => {
                     debug!(
@@ -191,7 +191,7 @@ where
                             .produce(t, retrier.get_brokers_retry(), &msg)
                             .await;
                         let offst = msg.metadata.offset.unwrap();
-                        processor.ack(offst);
+                        processor.ack(offst, msg.metadata.partition.unwrap());
                     }
                 }
             }

@@ -13,7 +13,7 @@ use crate::pb::FlowMessage;
 use tokio::sync::mpsc;
 
 use async_trait::async_trait;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use prost::Message as PBMessage;
 use rdkafka::consumer::{Consumer, StreamConsumer};
 use rdkafka::message::{Message, OwnedHeaders, OwnedMessage};
@@ -40,12 +40,15 @@ impl KafkaProcessingAgent {
             .subscribe(&[consumer_topic])
             .unwrap_or_else(|_| panic!("Unable to subscribe to topic {}", consumer_topic));
 
-        let consumer_guard = ConsumerOffsetGuard::new(&consumer, consumer_topic);
+        let assignment = consumer.assignment().unwrap();
+        warn!("assignment = {assignment:?}");
+        let consumer = Arc::new(consumer);
+        let consumer_guard = ConsumerOffsetGuard::new(consumer.clone(), consumer_topic);
         info!("created kafka processing agent");
 
         Self {
             producer,
-            consumer: Arc::new(consumer),
+            consumer,
             consumer_guard,
         }
     }
@@ -55,6 +58,7 @@ impl KafkaProcessingAgent {
                                            // FlowMessageMetadata
         let mut metadata: FlowMessageMetadata = hdrs.try_into().unwrap();
         metadata.offset = Some(msg.offset());
+        metadata.partition = Some(msg.partition());
 
         match msg.payload_view::<[u8]>() {
             Some(Ok(f)) => {
@@ -84,11 +88,12 @@ impl KafkaProcessingAgent {
 #[async_trait]
 impl Transport for KafkaProcessingAgent {
     async fn guard_acks(&self) {
-        self.consumer_guard.inc_offset(&self.consumer).await
+        self.consumer_guard.inc_offset(self.consumer.clone()).await
     }
 
-    fn ack(&self, offset: i64) {
-        self.consumer_guard.stash_processed_offset(offset)
+    fn ack(&self, offset: i64, partition: i32) {
+        self.consumer_guard
+            .stash_processed_offset(&self.consumer, offset, partition)
     }
 
     async fn consume(&self, broker: Arc<TokioMtx<Broker>>, mut notify_rx: mpsc::Receiver<usize>) {

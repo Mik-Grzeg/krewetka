@@ -84,12 +84,15 @@ impl Retrier {
             None => return,
         };
 
-        let offset_guard = Arc::new(ConsumerOffsetGuard::new(&consumer, &destination_topic));
+        let offset_guard = Arc::new(ConsumerOffsetGuard::new(
+            consumer.clone(),
+            &destination_topic,
+        ));
 
         let offset_clone = offset_guard.clone();
         let cons_clone = consumer.clone();
         let guard_fut = task::spawn(async move {
-            offset_clone.inc_offset(&cons_clone).await;
+            offset_clone.inc_offset(cons_clone).await;
         });
 
         if let Err(e) = consumer.subscribe(&[&destination_topic]) {
@@ -110,6 +113,7 @@ impl Retrier {
                                                       // FlowMessageMetadata
                     let mut metadata = FlowMessageMetadata::try_from(hdrs).unwrap();
                     metadata.offset = Some(ev.offset());
+                    metadata.partition = Some(ev.partition());
 
                     if let Some(x) = ev.timestamp().to_millis() {
                         // TODO pause consumer because it may timeout for the higher retry tiers
@@ -123,7 +127,20 @@ impl Retrier {
                                 destination_topic,
                                 deadline as u64 * 60
                             );
+                            let assignment = consumer.assignment().unwrap();
+
+                            info!(
+                                "pausing {:?} for :{} seconds",
+                                assignment,
+                                deadline as u64 * 60
+                            );
+                            consumer
+                                .pause(&assignment)
+                                .unwrap_or_else(|e| error!("error while pausing consumer: {}", e));
                             sleep(Duration::from_secs(deadline as u64 * 60)).await;
+                            consumer
+                                .resume(&assignment)
+                                .unwrap_or_else(|e| error!("error while resuming consumer: {}", e));
                         }
 
                         match producer
@@ -149,7 +166,11 @@ impl Retrier {
                             Ok(_) => {
                                 let offst = metadata.offset.unwrap();
 
-                                offset_guard.stash_processed_offset(offst);
+                                offset_guard.stash_processed_offset(
+                                    &consumer,
+                                    offst,
+                                    metadata.partition.unwrap(),
+                                );
                             }
                         }
                     }

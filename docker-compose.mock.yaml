@@ -5,6 +5,8 @@ services:
     build: ./dummy-importer
     ports:
       - "5561:5561"
+    environment:
+      RPS: 1000
 
   collector:
     build:

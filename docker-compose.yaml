@@ -39,26 +39,26 @@ services:
       KREWETKA__EXPORTER__SETTINGS__KAFKA_BROKERS: "broker:9092"
       KREWETKA__EXPORTER__SETTINGS__KAFKA_TOPIC: "flows"
 
-  processor:
-    build:
-      dockerfile: ./processor/Dockerfile
-      target: processor
-    depends_on:
-      - broker
-      - classifier_server
-      - collector
-      - migrator
-      - clickhouse
-    environment:
-      KREWETKA__KAFKA_BROKERS: "broker:9092"
-      KREWETKA__KAFKA_TOPIC: "flows"
-      KREWETKA__CLICKHOUSE_SETTINGS__HOST: "clickhouse"
-      KREWETKA__CLICKHOUSE_SETTINGS__PORT: 9000
-      KREWETKA__CLICKHOUSE_SETTINGS__USER: "myuser"
-      KREWETKA__CLICKHOUSE_SETTINGS__PASSWORD: "password"
-      KREWETKA__GRPC_CLASSIFICATION_PORT: 50051
-      KREWETKA__GRPC_CLASSIFICATION_HOST: classifier_server
-      RUST_LOG: info
+  # processor:
+  #   build:
+  #     dockerfile: ./processor/Dockerfile
+  #     target: processor
+  #   depends_on:
+  #     - broker
+  #     - classifier_server
+  #     - collector
+  #     - migrator
+  #     - clickhouse
+  #   environment:
+  #     KREWETKA__KAFKA_BROKERS: "broker:9092"
+  #     KREWETKA__KAFKA_TOPIC: "flows"
+  #     KREWETKA__CLICKHOUSE_SETTINGS__HOST: "clickhouse"
+  #     KREWETKA__CLICKHOUSE_SETTINGS__PORT: 9000
+  #     KREWETKA__CLICKHOUSE_SETTINGS__USER: "myuser"
+  #     KREWETKA__CLICKHOUSE_SETTINGS__PASSWORD: "password"
+  #     KREWETKA__GRPC_CLASSIFICATION_PORT: 50051
+  #     KREWETKA__GRPC_CLASSIFICATION_HOST: classifier_server
+  #     RUST_LOG: info
 
   migrator:
     build:
@@ -78,6 +78,8 @@ services:
       nofile:
         soft: 262144
         hard: 262144
+    ports:
+      - "9000:9000"
     environment:
       CLICKHOUSE_USER: "myuser"
       CLICKHOUSE_PASSWORD: "password"
@@ -85,3 +87,7 @@ services:
   classifier_server:
     build:
       dockerfile: ./classification/Dockerfile
+    ports:
+      - 50051:50051
+    environment:
+      GRPC_SERVER_PORT: 50051

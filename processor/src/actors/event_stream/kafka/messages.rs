@@ -34,6 +34,7 @@ impl TryFrom<&OwnedHeaders> for FlowMessageMetadata {
             timestamp,
             retry,
             offset: None,
+            partition: None,
         })
     }
 }
@@ -68,6 +69,7 @@ impl TryFrom<&BorrowedHeaders> for FlowMessageMetadata {
             timestamp,
             retry,
             offset: None,
+            partition: None,
         })
     }
 }

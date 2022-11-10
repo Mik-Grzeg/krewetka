@@ -69,7 +69,7 @@ impl ClickhouseState {
            tcp_flags:      f.flow_message.tcp_flags,
            timestamp:      Utc.timestamp(f.metadata.timestamp as i64, 0),
         }) {
-            Ok(()) => AckMessage::Ack(f.metadata.offset.unwrap()),
+            Ok(()) => AckMessage::Ack(f.metadata.offset.unwrap(), f.metadata.partition.unwrap()),
             Err(_e) => AckMessage::NackRetry(f.to_owned()),
         }
     }
