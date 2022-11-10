@@ -5,10 +5,10 @@ jobs:
   build_docker_image:
     runs-on: ubuntu-latest
     strategy:
-      max-parallel: 2
+      max-parallel: 3
       fail-fast: false
       matrix:
-        app: ["collector", "processor"]
+        app: ["collector", "processor", "reporting"]
     steps:
       - uses: actions/checkout@v3
 

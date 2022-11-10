@@ -1,0 +1,24 @@
+[package]
+name = "reporting"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clickhouse-rs = { git = "https://github.com/suharev7/clickhouse-rs.git", rev = "e40016bbc7546fb4d32340db074d3c66643cd5ca" }
+actix-web = "4.2.1"
+log = "0.4.17"
+env_logger = "0.9.0"
+config = "0.13.2"
+serde = "1.0.147"
+serde_json = "1.0.87"
+
+[lib]
+name = "lib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "api"
+path = "src/main.rs"
+
