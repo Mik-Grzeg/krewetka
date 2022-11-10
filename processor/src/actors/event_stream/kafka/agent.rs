@@ -58,6 +58,7 @@ impl KafkaProcessingAgent {
                                            // FlowMessageMetadata
         let mut metadata: FlowMessageMetadata = hdrs.try_into().unwrap();
         metadata.offset = Some(msg.offset());
+        metadata.partition = Some(msg.partition());
 
         match msg.payload_view::<[u8]>() {
             Some(Ok(f)) => {
@@ -90,8 +91,9 @@ impl Transport for KafkaProcessingAgent {
         self.consumer_guard.inc_offset(self.consumer.clone()).await
     }
 
-    fn ack(&self, offset: i64) {
-        self.consumer_guard.stash_processed_offset(offset)
+    fn ack(&self, offset: i64, partition: i32) {
+        self.consumer_guard
+            .stash_processed_offset(&self.consumer, offset, partition)
     }
 
     async fn consume(&self, broker: Arc<TokioMtx<Broker>>, mut notify_rx: mpsc::Receiver<usize>) {
@@ -102,7 +104,6 @@ impl Transport for KafkaProcessingAgent {
 
         let mut counter: usize = 0;
         while let Some(capacity) = notify_rx.recv().await {
-
             info!("Received capacity: {}", capacity);
             while counter < capacity {
                 let event = match self.consumer.recv().await {

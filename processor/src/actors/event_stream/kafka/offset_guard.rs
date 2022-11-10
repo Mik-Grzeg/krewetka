@@ -1,11 +1,9 @@
-use actix_web::cookie::time::format_description::modifier::OffsetSecond;
 use rdkafka::consumer::CommitMode;
 use rdkafka::consumer::Consumer;
 use rdkafka::consumer::StreamConsumer;
-use rdkafka::error::KafkaResult;
+
 use rdkafka::error::{KafkaError, RDKafkaErrorCode};
-use rdkafka::topic_partition_list;
-use rdkafka::topic_partition_list::TopicPartitionListElem;
+
 use std::collections::BinaryHeap;
 use std::sync::{Arc, Mutex};
 
@@ -27,7 +25,6 @@ pub fn get_current_offset(consumer: &Arc<StreamConsumer<CustomContext>>, topic: 
     //     }
     //     _ => continue
     // }
-
 
     let mut tpl = TopicPartitionList::new();
     let _ = tpl.add_partition(topic, 0);
@@ -56,7 +53,7 @@ pub struct ConsumerOffsetGuard {
 }
 
 impl ConsumerOffsetGuard {
-    pub fn new(consumer: Arc<StreamConsumer<CustomContext>>, topic: &str) -> Self {
+    pub fn new(_consumer: Arc<StreamConsumer<CustomContext>>, topic: &str) -> Self {
         let heap: Arc<Mutex<BinaryHeap<i64>>> = Arc::new(Mutex::new(BinaryHeap::new()));
 
         // let last_stored_offset = match get_current_offset(&consumer, topic) {
@@ -72,8 +69,16 @@ impl ConsumerOffsetGuard {
         }
     }
 
-    pub fn stash_processed_offset(&self, offset: i64) {
-        self.processed_offsets.clone().lock().unwrap().push(-offset)
+    pub fn stash_processed_offset(
+        &self,
+        consumer: &Arc<StreamConsumer<CustomContext>>,
+        offset: i64,
+        partition: i32,
+    ) {
+        // self.processed_offsets.clone().lock().unwrap().push(-offset)
+        if let Err(_e) = consumer.store_offset(&self.topic, partition, offset) {
+            error!("error occured while trying to store Offset({offset}) to [{topic}] at partition {partition}", topic=self.topic);
+        };
     }
 
     fn peek_heap(&self, peek: &Option<&i64>, last_stored_offset: &i64) -> bool {
@@ -95,11 +100,10 @@ impl ConsumerOffsetGuard {
                 Ok(l) => l,
                 Err(_) => {
                     warn!("continued at consumer.committed()");
-                    continue
+                    continue;
                 }
             };
             let partition = c.elements_for_topic(&self.topic);
-
 
             // partition = c.elements_for_topic(&self.topic);
 
@@ -109,9 +113,14 @@ impl ConsumerOffsetGuard {
             }
 
             for elem in partition.iter() {
-                info!("partition for [{}]: {:?} with offset {:?}", self.topic, elem.partition(), elem.offset());
+                info!(
+                    "partition for [{}]: {:?} with offset {:?}",
+                    self.topic,
+                    elem.partition(),
+                    elem.offset()
+                );
             }
-            let partition1 = partition.into_iter().nth(0).unwrap();
+            let partition1 = partition.into_iter().next().unwrap();
 
             {
                 let mut last_stored_offset = self.last_stored_offset.lock().unwrap();
@@ -121,38 +130,43 @@ impl ConsumerOffsetGuard {
                 *last_stored_offset = match fetched_offset {
                     Offset::Offset(o) => o,
                     Offset::Invalid => 0,
-                    o => panic!("Unexpected offset {:?} for {}/{}", o, self.topic, partition1.partition())
+                    o => panic!(
+                        "Unexpected offset {:?} for {}/{}",
+                        o,
+                        self.topic,
+                        partition1.partition()
+                    ),
                 }
             }
             ready = true;
         }
     }
 
-    pub async fn inc_offset(&self, consumer: Arc<StreamConsumer<CustomContext>>) {
-        let heap = self.processed_offsets.clone();
-        info!(
-            "Spawned offset incrementer for {} with current offset {:?}",
-            self.topic,
-            self.last_stored_offset.lock().unwrap()
-        );
+    pub async fn inc_offset(&self, _consumer: Arc<StreamConsumer<CustomContext>>) {
+        // let heap = self.processed_offsets.clone();
+        // info!(
+        //     "Spawned offset incrementer for {} with current offset {:?}",
+        //     self.topic,
+        //     self.last_stored_offset.lock().unwrap()
+        // );
 
-        self.tt(&consumer).await;
+        // self.tt(&consumer).await;
 
-        loop {
+        // loop {
 
-            sleep(Duration::from_secs(2)).await;
+        //     sleep(Duration::from_secs(2)).await;
 
-            info!("{:?}", heap.lock().unwrap());
-            let mut heap_peek = heap.lock().unwrap();
+        //     info!("{:?}", heap.lock().unwrap());
+        //     let mut heap_peek = heap.lock().unwrap();
 
-            let mut last_stored_offset = self.last_stored_offset.lock().unwrap();
-            while self.peek_heap(&heap_peek.peek(), &last_stored_offset) {
-                *last_stored_offset = -heap_peek.pop().unwrap();
-            }
+        //     let mut last_stored_offset = self.last_stored_offset.lock().unwrap();
+        //     while self.peek_heap(&heap_peek.peek(), &last_stored_offset) {
+        //         *last_stored_offset = -heap_peek.pop().unwrap();
+        //     }
 
-            // make it into a stream with a timeout to commit
-            self.store_offset(*last_stored_offset, &consumer)
-        }
+        //     // make it into a stream with a timeout to commit
+        //     self.store_offset(*last_stored_offset, &consumer)
+        // }
     }
 
     fn store_offset(&self, offset: i64, consumer: &Arc<StreamConsumer<CustomContext>>) {

@@ -11,7 +11,7 @@ pub trait Transport: Send + Sync {
     async fn consume(&self, broker: Arc<TokioMtx<Broker>>, notify_rx: mpsc::Receiver<usize>);
     async fn produce(&self, topic: &str, brokers: &str, msg: &FlowMessageWithMetadata);
     async fn guard_acks(&self);
-    fn ack(&self, id: i64);
+    fn ack(&self, id: i64, partition: i32);
 }
 
 #[async_trait]

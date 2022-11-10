@@ -17,7 +17,7 @@ impl ConsumerContext for CustomContext {
         info!("Post rebalance {:?}", rebalance);
     }
 
-    fn commit_callback(&self, _result: KafkaResult<()>, _offsets: &TopicPartitionList) {
-        // info!("Committing offsets: {:?}", offsets);
+    fn commit_callback(&self, _result: KafkaResult<()>, offsets: &TopicPartitionList) {
+        info!("Committing offsets: {:?}", offsets);
     }
 }

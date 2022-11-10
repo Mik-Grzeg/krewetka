@@ -12,7 +12,7 @@ pub enum ProcessedFinished {
 #[rtype(result = "()")]
 #[derive(Clone)]
 pub enum AckMessage {
-    Ack(i64),
+    Ack(i64, i32),
     NackRetry(FlowMessageWithMetadata),
 }
 
@@ -27,6 +27,7 @@ pub struct FlowMessageMetadata {
     pub id: String,
     pub retry: usize,
     pub offset: Option<i64>,
+    pub partition: Option<i32>,
 }
 
 // TODO move it to kafka dir
