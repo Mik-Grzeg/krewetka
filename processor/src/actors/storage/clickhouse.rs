@@ -67,6 +67,7 @@ impl ClickhouseState {
            flow_duration_milliseconds: f.flow_message.flow_duration_milliseconds,
            protocol:       f.flow_message.protocol,
            tcp_flags:      f.flow_message.tcp_flags,
+           malicious:      f.malicious.unwrap_or(false),
            timestamp:      Utc.timestamp(f.metadata.timestamp as i64, 0),
         }) {
             Ok(()) => AckMessage::Ack(f.metadata.offset.unwrap(), f.metadata.partition.unwrap()),

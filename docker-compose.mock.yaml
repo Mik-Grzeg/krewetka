@@ -6,7 +6,7 @@ services:
     ports:
       - "5561:5561"
     environment:
-      RPS: 1000
+      RPS: 10000
 
   collector:
     build:
