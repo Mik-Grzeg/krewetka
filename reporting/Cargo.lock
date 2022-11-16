@@ -1534,6 +1534,7 @@ dependencies = [
  "chrono",
  "clickhouse-rs",
  "config",
+ "derive_more",
  "env_logger",
  "log",
  "mockall",
