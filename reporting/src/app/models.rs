@@ -14,7 +14,7 @@ pub struct ThroughputStats {
     packets_per_second: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct MaliciousVsNonMalicious {
     malicious: u64,
     non_malicious: u64,
