@@ -89,9 +89,13 @@ impl Display for QueryCondition {
         }
         let length = self.conditions.len();
 
-        fmt.write_str("")?;
+        fmt.write_str(" ")?;
         fmt.write_str(&self.start)?;
-        fmt.write_str(&self.conditions[..length - 1].join("AND "))?;
+        fmt.write_str(" ")?;
+        self.conditions[..length - 1].iter().for_each(|c| {
+            fmt.write_str(c).unwrap();
+            fmt.write_str(" AND ").unwrap();
+        });
         fmt.write_str(&self.conditions[length - 1])?;
 
         Ok(())
@@ -118,9 +122,9 @@ pub trait DbAccessor {
         end_date: Option<DateTime<Utc>>,
     ) -> Result<MaliciousVsNonMalicious, AppError> {
         let condition = QueryCondition::new()
-            .condition(host.map(|v| format!("host = {v}")))
-            .condition(start_date.map(|v| format!("timestamp <= {v}")))
-            .condition(end_date.map(|v| format!("timestamp < {v}")))
+            .condition(host.map(|v| format!("host = '{v}'")))
+            .condition(start_date.map(|v| format!("timestamp >= parseDateTimeBestEffort('{v}')")))
+            .condition(end_date.map(|v| format!("timestamp < parseDateTimeBestEffort('{v}')")))
             .prepare();
 
         let mut query = "WITH countMap(map(malicious, 1)) AS map SELECT map[true] as n_malicious, map[false] as n_non_malicious FROM messages".to_owned();
@@ -169,6 +173,22 @@ pub mod db_layer_tests {
         Ok(MaliciousVsNonMalicious::default())
     }
 
+    #[test]
+    fn test_display_query_condition() {
+        let conditions = QueryCondition::new()
+            .condition(Some("host = 'bb'".to_owned()))
+            .condition(Some("test >= 1".to_owned()))
+            .condition(None)
+            .condition(Some("date < '2022-10-11T12:00:00Z'".to_owned()))
+            .condition(None)
+            .prepare();
+
+        assert_eq!(
+            " WHERE host = 'bb' AND test >= 1 AND date < '2022-10-11T12:00:00Z'",
+            conditions
+        )
+    }
+
     #[actix_web::test]
     async fn test_db_query_called() {
         let mut db = MockDbQuerier::new();
@@ -197,9 +217,9 @@ pub mod db_layer_tests {
 
         let mut query = "WITH countMap(map(malicious, 1)) AS map SELECT map[true] as n_malicious, map[false] as n_non_malicious FROM messages".to_owned();
         let condition = QueryCondition::new()
-            .condition(host.map(|v| format!("host = {v}")))
-            .condition(start_date.map(|v| format!("timestamp <= {v}")))
-            .condition(end_date.map(|v| format!("timestamp < {v}")))
+            .condition(host.map(|v| format!("host = '{v}'")))
+            .condition(start_date.map(|v| format!("timestamp >= parseDateTimeBestEffort('{v}')")))
+            .condition(end_date.map(|v| format!("timestamp < parseDateTimeBestEffort('{v}')")))
             .prepare();
         query.push_str(&condition);
 

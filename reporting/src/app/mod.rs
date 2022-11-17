@@ -1,5 +1,6 @@
 mod config;
 pub mod db;
+mod doc;
 pub mod errors;
 mod handlers;
 mod models;
