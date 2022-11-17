@@ -1,4 +1,5 @@
-use actix_web::{web, App, HttpServer};
+use actix_cors::Cors;
+use actix_web::{middleware, web, App, HttpServer};
 use lib::app::db;
 use lib::app::routes;
 use lib::app::state;
@@ -18,8 +19,12 @@ async fn main() -> Result<(), std::io::Error> {
     let db = db::init(settings);
 
     HttpServer::new(move || {
+        let cors = Cors::permissive();
+
         App::new()
             .app_data(web::Data::new(db.clone()))
+            .wrap(cors)
+            .wrap(middleware::Logger::default())
             .configure(routes)
     })
     .bind(("127.0.0.1", HTTP_PORT))

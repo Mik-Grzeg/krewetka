@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 clickhouse-rs = { git = "https://github.com/suharev7/clickhouse-rs.git", rev = "e40016bbc7546fb4d32340db074d3c66643cd5ca" }
 actix-web = "4.2.1"
+actix-cors = "0.6.4"
 log = "0.4.17"
 env_logger = "0.9.0"
 config = "0.13.2"
@@ -16,11 +17,16 @@ serde_json = "1.0.87"
 async-trait = "0.1.57"
 chrono = { version = "0.4.22", features = ["serde"] }
 derive_more = "0.99.17"
+utoipa-swagger-ui = { version = "2.0.1", features = ["actix-web"] }
+utoipa = { version = "2.3.0", features = ["actix_extras", "chrono"] }
 
 [dev-dependencies]
 pretty_assertions = "1.3.0"
 test-case = "2.2.1"
 mockall = "0.11.2"
+serde_qs = "0.10.1"
+urlencoding = "2.1.2"
+itertools = "0.10.5"
 
 [lib]
 name = "lib"

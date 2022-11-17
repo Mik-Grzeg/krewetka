@@ -4,6 +4,7 @@ use clickhouse_rs::types::Complex;
 
 use clickhouse_rs::Block;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use super::errors::AppError;
 
@@ -14,7 +15,7 @@ pub struct ThroughputStats {
     packets_per_second: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, ToSchema)]
 pub struct MaliciousVsNonMalicious {
     malicious: u64,
     non_malicious: u64,

@@ -1,9 +1,17 @@
 use super::db::DbLayer;
-use super::handlers::get_stats;
-use super::handlers::healthz;
+use super::doc::ApiDoc;
+use super::handlers;
 use actix_web::web;
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 pub fn routes(cfg: &mut web::ServiceConfig) {
-    cfg.service(healthz);
-    cfg.route("/malicious_proportion", web::get().to(get_stats::<DbLayer>));
+    cfg.service(
+        SwaggerUi::new("/swagger-ui/{_:.*}").url("/api-doc/openapi.json", ApiDoc::openapi()),
+    );
+    cfg.route("/healthz", web::get().to(handlers::healthz));
+    cfg.route(
+        "/grouped_packets_number",
+        web::get().to(handlers::get_stats::<DbLayer>),
+    );
 }
