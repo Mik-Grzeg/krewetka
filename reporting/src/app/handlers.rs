@@ -5,6 +5,7 @@ use chrono::DateTime;
 use chrono::Utc;
 use serde::Deserialize;
 use utoipa::IntoParams;
+use log::{info, warn, debug, error};
 
 /// Health check endpoint
 ///

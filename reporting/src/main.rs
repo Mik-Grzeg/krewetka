@@ -1,8 +1,8 @@
 use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpServer};
-use lib::app::db;
-use lib::app::routes;
-use lib::app::state;
+use reporting::app::db_init;
+use reporting::app::routes;
+use reporting::app::state;
 
 const HTTP_PORT: u16 = 8080;
 
@@ -16,7 +16,7 @@ async fn main() -> Result<(), std::io::Error> {
         .await
         .expect("unable to initialize app state");
     let settings = state.config()?;
-    let db = db::init(settings);
+    let db = db_init(settings);
 
     HttpServer::new(move || {
         let cors = Cors::permissive();

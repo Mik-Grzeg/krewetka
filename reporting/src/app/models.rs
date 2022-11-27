@@ -1,5 +1,10 @@
 use chrono::DateTime;
+use chrono::FixedOffset;
+use chrono::offset::TimeZone;
 use chrono::Utc;
+use chrono_tz::Tz;
+use clickhouse_rs::types::DateTimeType;
+use actix::Message;
 use clickhouse_rs::types::Complex;
 
 use clickhouse_rs::Block;
@@ -8,12 +13,47 @@ use utoipa::ToSchema;
 
 use super::errors::AppError;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Message, Serialize, Deserialize, Debug)]
+#[rtype(result = "()")]
 pub struct ThroughputStats {
-    start_date: DateTime<Utc>,
-    end_date: DateTime<Utc>,
+    time: DateTime<Utc>,
     packets_per_second: u64,
 }
+
+pub struct ThroughputStatusVec(pub Vec<ThroughputStats>);
+
+impl TryFrom<Block<Complex>> for ThroughputStatusVec {
+    type Error = AppError;
+
+    fn try_from(block: Block<Complex>) -> Result<Self, Self::Error> {
+
+        let rows = block.rows()
+            .map(|row| {
+                // let time: &str =
+                let time: DateTime<Tz> = row.get("time").unwrap();
+                let time = time.with_timezone(&Utc);
+                let packets_per_second = row.get("packets_per_second").unwrap();
+                ThroughputStats::new(time, packets_per_second)
+            })
+            .collect::<Vec<ThroughputStats>>();
+        Ok(Self(rows))
+    }
+}
+
+impl ThroughputStats {
+    pub fn new(time: DateTime<Utc>, packets_per_second: u64) -> Self {
+
+        Self {
+            time,
+            packets_per_second
+        }
+    }
+
+    pub fn get_time(&self) -> DateTime<Utc> {
+        self.time
+    }
+}
+
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, ToSchema)]
 pub struct MaliciousVsNonMalicious {
