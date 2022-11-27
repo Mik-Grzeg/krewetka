@@ -5,9 +5,14 @@ use derive_more::{Display, Error};
 use log::error;
 use std::io::Error as IoErr;
 
+/// Error that may occurs before starting the actual application
+/// It is generated while trying to configure all the modules
 #[derive(Debug)]
 pub enum ConfigErr {
+    /// Reading [config::Config] fails
     Read(config::ConfigError),
+
+    /// Some of the necessary settings are missing after parsing config
     MissingNeccessarySetting(String),
 }
 
@@ -24,11 +29,19 @@ impl From<ConfigErr> for IoErr {
     }
 }
 
+/// AppError is an Error that may occur while the application is working
 #[derive(Debug)]
 pub enum AppError {
+    /// Quering database failed
     DBAccessorError(String),
+
+    /// Acquiring database connector from pool failed
     DbCouldNotGetHandler(clickhouse_rs::errors::Error),
+
+    /// Json serialization failed
     JsonSerialization(String),
+
+    /// Not implemented error
     Unimplemented,
 }
 
@@ -46,6 +59,16 @@ impl From<ChErr> for AppError {
     }
 }
 
+/// Capability to convert [AppError] to [ResponderErr]
+///
+/// ```rust
+/// # use actix_web::Responder;
+/// use AppError;
+///
+/// fn handler() -> impl Responder {
+///     AppError::Unimplemented
+/// }
+/// ```
 impl From<AppError> for ResponderErr {
     fn from(e: AppError) -> Self {
         match e {
