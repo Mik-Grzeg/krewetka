@@ -1,54 +1,28 @@
-FROM lukemathwalker/cargo-chef:latest-rust-1.63.0 AS chef
-WORKDIR /app
+# syntax=docker/dockerfile:1.4
 
-FROM chef as planner
-COPY reporting .
-RUN cargo chef prepare --recipe-path recipe.json
+FROM rust:1.65 as builder
 
-####################################################################################################
-## Builder
-####################################################################################################
+# Capture dependencies
+COPY Cargo.toml Cargo.lock /app/
 
-FROM chef as builder
+RUN cargo new /app/reporting
+COPY ./Cargo.toml /app/reporting
 
-# Create appuser
-ENV USER=krewetka
-ENV UID=10001
+# Compiles only our dependencies and saves them in a layer
+WORKDIR /app/reporting
+RUN --mount=type=cache,target=/usr/local/cargo/registry cargo build --release
 
-COPY reporting ./
+# Copy source code
+COPY . /app
 
-RUN adduser \
-    --disabled-password \
-    --gecos "" \
-    --home "/nonexistent" \
-    --shell "/sbin/nologin" \
-    --no-create-home \
-    --uid "${UID}" \
-    "${USER}"
+RUN --mount=type=cache,target=/usr/local/cargo/registry --mount=type=cache,target=/app/target \
+  set -e \
+  cargo build --release
+  # mv /app/reporting/target/release/reporting /app
 
-WORKDIR /app
-COPY --from=planner /app/recipe.json recipe.json
-RUN cargo chef cook --release --recipe-path recipe.json
+FROM debian:buster-slim as app
+COPY --from=builder /app/reporting/target/release/reporting /reporting
+CMD ["./reporting"]
 
-RUN cargo build --release
 
-####################################################################################################
-## Final image reporting
-####################################################################################################
-FROM debian:bookworm as reporting
-
-# Import from builder.
-COPY --from=builder /etc/passwd /etc/passwd
-COPY --from=builder /etc/group /etc/group
-
-WORKDIR /app
-
-# Copy our build
-COPY --from=builder /app/target/release/reporting ./reporting
-
-# Use an unprivileged user.
-USER krewetka:krewetka
-
-ENV RUST_LOG="debug"
-CMD [ "/app/reporting" ]
 
