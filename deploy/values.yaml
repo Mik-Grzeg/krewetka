@@ -61,6 +61,9 @@ krewetka:
   classifier:
     image: krewetka/classifier
 
+  reporting:
+    image: krewetka/reporting
+
   config:
     clickhouse:
       user: myuser
@@ -74,7 +77,7 @@ krewetka:
 
     classifier:
       port: 50051
-      host: classifier
+      host: classifier-svc
 
 
 

@@ -20,10 +20,22 @@ classifier:
   configMap:
     name: classifier-config
   replicas: 3
-  image: 
+  image:
   version: 0.0.1
 
   grpcServerPort: 50051
+
+reporting:
+  configMap:
+    name: reporting-config
+  secret:
+    name: reporting-secret
+  replicas: 2
+  image:
+  version: 0.0.1
+  livenessProbe:
+    initialDelaySeconds: 3
+    periodSeconds: 3
 
 registry:
   url:

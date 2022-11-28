@@ -68,7 +68,7 @@ impl<T: Querier + DbAccessor> ThroughputWs<T> {
     }
 
     fn fresh_data(&mut self, ctx: &mut ws::WebsocketContext<Self>) {
-        ctx.run_interval(self.init_params.aggr_interval, |act, ctx|{
+        ctx.run_interval(HEARTBEAT_INTERVAL, |act, ctx|{
 
             warn!("Running interval refresh data");
             let address = ctx.address();
@@ -168,7 +168,7 @@ pub struct ThroughputParams {
 }
 
 fn default_aggr_interval() -> Duration {
-    Duration::from_secs(30)
+    Duration::from_secs(60*60*24)
 }
 
 
