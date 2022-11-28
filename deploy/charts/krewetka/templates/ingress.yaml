@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-fanout
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /grouped_packets_number
+            pathType: Prefix
+            backend:
+              service:
+                name: reporting-svc
+                port:
+                  number: 8080
+          - path: /throughput
+            pathType: Prefix
+            backend:
+              service:
+                name: reporting-svc
+                port:
+                  number: 8080
+

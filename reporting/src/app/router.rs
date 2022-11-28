@@ -15,5 +15,5 @@ pub fn routes(cfg: &mut web::ServiceConfig) {
         "/grouped_packets_number",
         web::get().to(handlers::get_stats::<DbLayer>),
     );
-    cfg.route("/throughput_ws", web::get().to(ws_handlers::throughput_ws::<DbLayer>));
+    cfg.route("/throughput", web::get().to(ws_handlers::throughput_ws::<DbLayer>));
 }

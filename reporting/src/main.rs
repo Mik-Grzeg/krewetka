@@ -27,7 +27,7 @@ async fn main() -> Result<(), std::io::Error> {
             .wrap(middleware::Logger::default())
             .configure(routes)
     })
-    .bind(("127.0.0.1", HTTP_PORT))
+    .bind(("0.0.0.0", HTTP_PORT))
     .unwrap_or_else(|_| panic!("unable to bind to port {}", HTTP_PORT))
     .run()
     .await
