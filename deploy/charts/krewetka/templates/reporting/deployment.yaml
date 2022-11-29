@@ -19,6 +19,8 @@ spec:
         app: reporting
         {{- include "krewetka.selectorLabels" . | nindent 8 }}
     spec:
+      imagePullSecrets:
+        - name: {{ .Values.registry.imagePullSecrets }}
       containers:
       - name: reporting
         image: "{{ .Values.registry.url }}/{{ .Values.reporting.image }}:{{ .Values.reporting.version }}"
@@ -36,8 +38,6 @@ spec:
           runAsNonRoot: true
           runAsUser: 1000
           runAsGroup: 999
-        # imagePullSecrets:
-        #   - name: {{ .Values.registry.imagePullSecrets }}
         envFrom:
         - configMapRef:
             name: {{ .Values.reporting.configMap.name }}

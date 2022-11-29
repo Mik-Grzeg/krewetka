@@ -3,5 +3,5 @@ apiVersion: v2
 name: krewetka
 type: application
 version: 0.0.1
-metadata: 
+metadata:
   namespace: krewetka

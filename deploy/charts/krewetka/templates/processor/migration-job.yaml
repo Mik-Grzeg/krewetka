@@ -9,10 +9,14 @@ metadata:
 spec:
   template:
     spec:
+      imagePullSecrets:
+        - name: {{ .Values.registry.imagePullSecrets }}
       containers:
       - name: processor-migration
-        image: "{{ .Values.registry.url }}/{{ .Values.processor.migrationJob.image }}:{{ .Values.processor.migrationJob.version }}"
+        image: "{{ .Values.registry.url }}/{{ .Values.processor.image }}:{{ .Values.processor.version }}"
         imagePullPolicy: {{ .Values.imagePullPolicy }}
+        command: ["./processor-migrator"]
+        args: ["apply", "/app/migrations"]
         envFrom:
         - secretRef:
               name: {{ .Values.processor.secret.name }}

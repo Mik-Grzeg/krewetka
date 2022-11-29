@@ -19,6 +19,8 @@ spec:
         app: classifier
         {{- include "krewetka.selectorLabels" . | nindent 8 }}
     spec:
+      imagePullSecrets:
+        - name: {{ .Values.registry.imagePullSecrets }}
       containers:
       - name: classifier
         image: "{{ .Values.registry.url }}/{{ .Values.classifier.image }}:{{ .Values.classifier.version }}"
