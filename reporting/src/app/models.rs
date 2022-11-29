@@ -1,11 +1,11 @@
+use actix::Message;
+
 use chrono::DateTime;
-use chrono::FixedOffset;
-use chrono::offset::TimeZone;
+
 use chrono::Utc;
 use chrono_tz::Tz;
-use clickhouse_rs::types::DateTimeType;
-use actix::Message;
 use clickhouse_rs::types::Complex;
+
 
 use clickhouse_rs::Block;
 use serde::{Deserialize, Serialize};
@@ -26,8 +26,8 @@ impl TryFrom<Block<Complex>> for ThroughputStatusVec {
     type Error = AppError;
 
     fn try_from(block: Block<Complex>) -> Result<Self, Self::Error> {
-
-        let rows = block.rows()
+        let rows = block
+            .rows()
             .map(|row| {
                 // let time: &str =
                 let time: DateTime<Tz> = row.get("time").unwrap();
@@ -42,10 +42,9 @@ impl TryFrom<Block<Complex>> for ThroughputStatusVec {
 
 impl ThroughputStats {
     pub fn new(time: DateTime<Utc>, packets_per_second: u64) -> Self {
-
         Self {
             time,
-            packets_per_second
+            packets_per_second,
         }
     }
 
@@ -54,8 +53,7 @@ impl ThroughputStats {
     }
 }
 
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, ToSchema)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, ToSchema)]
 pub struct MaliciousVsNonMalicious {
     malicious: u64,
     non_malicious: u64,
