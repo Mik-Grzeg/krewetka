@@ -35,7 +35,7 @@ impl AppConfigCache {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct Settings {
     pub clickhouse_user: String,
     pub clickhouse_password: String,

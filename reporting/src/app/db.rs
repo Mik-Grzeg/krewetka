@@ -6,17 +6,16 @@ use chrono::DateTime;
 use chrono::Utc;
 use clickhouse_rs::errors::Error;
 use clickhouse_rs::types::Complex;
+use clickhouse_rs::types::Row;
+use clickhouse_rs::types::Simple;
 use clickhouse_rs::Block;
 use clickhouse_rs::Pool;
-use clickhouse_rs::types::Simple;
-use clickhouse_rs::types::Row;
 use futures_core::stream::BoxStream;
 use log::{debug, info};
 use std::fmt::Display;
 use std::time::Duration;
 
-use super::models::{MaliciousVsNonMalicious, ThroughputStats};
-
+use super::models::{MaliciousVsNonMalicious};
 
 /// Initialization of database connector
 ///
@@ -39,7 +38,6 @@ pub struct DbLayer {
     pub pool: Pool,
 }
 
-
 /// Trait which serves the purpose of unified function to query database amongst databases
 ///
 /// Currently the trick with is for the testing  purposes, so the results of database calls can be
@@ -56,12 +54,11 @@ pub trait Querier: Send + Sync + Clone + 'static {
         query: &str,
     ) -> Result<T, AppError>;
 
-    async fn stream_db_result (
+    async fn stream_db_result(
         &self,
         query: &str,
     ) -> Result<BoxStream<Result<Row<Simple>, Error>>, AppError>;
 }
-
 
 #[async_trait]
 impl Querier for DbLayer {
@@ -78,15 +75,15 @@ impl Querier for DbLayer {
             .try_into()
     }
 
-    async fn stream_db_result (
+    async fn stream_db_result(
         &self,
-        query: &str,
-        ) -> Result<BoxStream<Result<Row<Simple>, Error>>, AppError> {
-            unimplemented!()
-            // let mut handler = self.pool.get_handle().await?;
-            // Ok(handler
-            //     .query(query)
-            //     .stream())
+        _query: &str,
+    ) -> Result<BoxStream<Result<Row<Simple>, Error>>, AppError> {
+        unimplemented!()
+        // let mut handler = self.pool.get_handle().await?;
+        // Ok(handler
+        //     .query(query)
+        //     .stream())
     }
 }
 
@@ -235,7 +232,7 @@ pub trait DbAccessor {
 }
 
 #[async_trait]
-impl DbAccessor for DbLayer { }
+impl DbAccessor for DbLayer {}
 
 /// Database layer tests module
 #[cfg(test)]

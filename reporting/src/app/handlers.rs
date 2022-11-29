@@ -3,9 +3,9 @@ use super::errors::ResponderErr;
 use actix_web::{http, web, HttpResponse, Responder};
 use chrono::DateTime;
 use chrono::Utc;
+
 use serde::Deserialize;
 use utoipa::IntoParams;
-use log::{info, warn, debug, error};
 
 /// Health check endpoint
 ///

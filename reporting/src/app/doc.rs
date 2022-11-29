@@ -1,6 +1,6 @@
-use utoipa::OpenApi;
 use super::handlers;
 use super::models::MaliciousVsNonMalicious;
+use utoipa::OpenApi;
 
 #[derive(OpenApi)]
 #[openapi(

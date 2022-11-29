@@ -1,25 +1,24 @@
-use actix::clock::sleep;
+use super::db::{DbAccessor, Querier};
+
+
+use actix::prelude::*;
+use actix_web::{web, Error, HttpRequest, HttpResponse};
+use actix_web_actors::ws;
 use chrono::DateTime;
 use chrono::Utc;
-use utoipa::IntoParams;
+use log::{info, warn};
 use serde::Deserialize;
 use serde_with::serde_as;
-use super::db::{DbAccessor, Querier, DbLayer};
-use super::models::ThroughputStats;
-use actix::prelude::*;
-use actix_web_actors::ws;
-use actix_web::{web, HttpResponse, Error, HttpRequest, Responder};
-use std::time::{Duration, Instant};
-use log::{info, debug, warn, error};
-use std::sync::Arc;
 use std::ops::Deref;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+
 
 /// How often hearbeat ping are sent
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 
 /// How long before lack of client response causes a timeout
 const WS_CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
-
 
 /// Websocket actor for throughput statistics
 #[derive(Debug)]
@@ -35,7 +34,7 @@ struct ThroughputWs<T: Querier + DbAccessor + 'static> {
     init_params: ThroughputParams,
 
     /// State of the already fetched data - [DateTime<Utc>]
-    last_fetched: Option<DateTime<Utc>>
+    last_fetched: Option<DateTime<Utc>>,
 }
 
 #[derive(Message)]
@@ -44,8 +43,12 @@ struct NotifyClient;
 
 impl<T: Querier + DbAccessor> ThroughputWs<T> {
     pub fn new(dl: Arc<T>, init_params: ThroughputParams) -> Self {
-
-        Self { hb: Instant::now(), db_layer: dl, init_params, last_fetched: None}
+        Self {
+            hb: Instant::now(),
+            db_layer: dl,
+            init_params,
+            last_fetched: None,
+        }
     }
 
     /// helper method that sends ping to client every 5 seconds (HEARTBEAT_INTERVAL)
@@ -68,15 +71,18 @@ impl<T: Querier + DbAccessor> ThroughputWs<T> {
     }
 
     fn fresh_data(&mut self, ctx: &mut ws::WebsocketContext<Self>) {
-        ctx.run_interval(HEARTBEAT_INTERVAL, |act, ctx|{
-
+        ctx.run_interval(HEARTBEAT_INTERVAL, |act, ctx| {
             warn!("Running interval refresh data");
             let address = ctx.address();
-            ctx.spawn(Box::pin(async move {
-                warn!("Sending NotifyClient to {address:?}");
-                address.send(NotifyClient).await;
-                warn!("Sent NotifyClient");
-            }.into_actor(act).map(|r, act, ctx| warn!("{r:?}"))));
+            ctx.spawn(Box::pin(
+                async move {
+                    warn!("Sending NotifyClient to {address:?}");
+                    address.send(NotifyClient).await;
+                    warn!("Sent NotifyClient");
+                }
+                .into_actor(act)
+                .map(|r, _act, _ctx| warn!("{r:?}")),
+            ));
             warn!("Refreshed data");
         });
     }
@@ -94,25 +100,27 @@ impl<T: Querier + DbAccessor> Actor for ThroughputWs<T> {
 }
 
 impl<T: Querier + DbAccessor> Handler<NotifyClient> for ThroughputWs<T> {
-    type Result: = ResponseActFuture<Self, ()>;
+    type Result = ResponseActFuture<Self, ()>;
 
-    fn handle(&mut self, msg: NotifyClient, ctx: &mut Self::Context) -> Self::Result {
-            let dl = self.db_layer.clone();
-            let aggr_interval = self.init_params.aggr_interval.clone();
-            let host = self.init_params.host.clone();
-            let start_time = self.last_fetched;
-            warn!("Got NotifyClient message");
-            warn!("{start_time:?}");
-            Box::pin(async move {
-                let stats_vec =
-                    (&dl)
+    fn handle(&mut self, _msg: NotifyClient, _ctx: &mut Self::Context) -> Self::Result {
+        let dl = self.db_layer.clone();
+        let aggr_interval = self.init_params.aggr_interval;
+        let host = self.init_params.host.clone();
+        let start_time = self.last_fetched;
+        warn!("Got NotifyClient message");
+        warn!("{start_time:?}");
+        Box::pin(
+            async move {
+                let stats_vec = dl
                     .fetch_throughput_stats(
                         &*dl,
-                        host.as_ref().map(Deref::deref),
+                        host.as_deref(),
                         &aggr_interval,
                         start_time,
-                        None
-                    ).await.unwrap();
+                        None,
+                    )
+                    .await
+                    .unwrap();
                 stats_vec.0
             }
             .into_actor(self)
@@ -122,37 +130,34 @@ impl<T: Querier + DbAccessor> Handler<NotifyClient> for ThroughputWs<T> {
                 let stat_parsed = serde_json::to_string_pretty(&res).unwrap();
                 info!("Parsed stats: {stat_parsed}");
                 ctx.text(stat_parsed);
-            })
+            }),
         )
     }
 }
 
 /// Handler for the throughput statistics data
-impl<T: Querier + DbAccessor> StreamHandler<Result<ws::Message, ws::ProtocolError>> for ThroughputWs<T> {
+impl<T: Querier + DbAccessor> StreamHandler<Result<ws::Message, ws::ProtocolError>>
+    for ThroughputWs<T>
+{
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
         match msg {
             Ok(ws::Message::Ping(msg)) => {
                 self.hb = Instant::now();
                 ctx.pong(&msg)
-            },
+            }
             Ok(ws::Message::Pong(_)) => {
                 self.hb = Instant::now();
-            },
-            Ok(ws::Message::Text(text)) => {
-                ctx.text("Got it")
-            },
-            Ok(ws::Message::Binary(bin)) => {
-                ctx.binary(bin)
-            },
+            }
+            Ok(ws::Message::Text(_text)) => ctx.text("Got it"),
+            Ok(ws::Message::Binary(bin)) => ctx.binary(bin),
             Ok(ws::Message::Close(reason)) => {
                 ctx.close(reason);
                 ctx.stop();
-            },
+            }
             _ => ctx.stop(),
         }
     }
 }
-
 
 /// Handler possible query parameters
 #[serde_with::serde_as]
@@ -164,13 +169,12 @@ pub struct ThroughputParams {
     aggr_interval: Duration,
 
     /// Host name
-    host: Option<String>
+    host: Option<String>,
 }
 
 fn default_aggr_interval() -> Duration {
-    Duration::from_secs(60*60*24)
+    Duration::from_secs(60 * 60 * 24)
 }
-
 
 /// Handler to initialize websocket
 // #[utoipa::path(
@@ -181,6 +185,15 @@ fn default_aggr_interval() -> Duration {
 //     ),
 //     params(MaliciousProportionQueryParams)
 // )]
-pub async fn throughput_ws<T: Querier + DbAccessor>(req: HttpRequest, query: web::Query<ThroughputParams>, stream: web::Payload, dal: web::Data<T>) -> Result<HttpResponse, Error> {
-    ws::start(ThroughputWs::new(dal.into_inner(), query.into_inner()), &req, stream)
+pub async fn throughput_ws<T: Querier + DbAccessor>(
+    req: HttpRequest,
+    query: web::Query<ThroughputParams>,
+    stream: web::Payload,
+    dal: web::Data<T>,
+) -> Result<HttpResponse, Error> {
+    ws::start(
+        ThroughputWs::new(dal.into_inner(), query.into_inner()),
+        &req,
+        stream,
+    )
 }
