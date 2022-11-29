@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS messages (
 	 flow_duration_milliseconds	UInt64,
 	 protocol		UInt32,
 	 tcp_flags		UInt32,
-	 malicious      Bool
+	 malicious      Bool,
 	 timestamp		DateTime
 ) Engine=MergeTree
 ORDER BY (timestamp)
