@@ -8,7 +8,7 @@ jobs:
       max-parallel: 3
       fail-fast: false
       matrix:
-        app: ["collector", "processor", "reporting"]
+        app: ["processor", "reporting"]
     steps:
       - uses: actions/checkout@v3
 

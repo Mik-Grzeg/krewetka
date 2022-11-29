@@ -1,21 +1,8 @@
-FROM lukemathwalker/cargo-chef:latest-rust-1.63.0 AS chef
-WORKDIR /app
+# syntax=docker/dockerfile:1.4
+FROM rust:1.65 as builder
 
-FROM chef as planner
-COPY ./collector .
-RUN cargo chef prepare --recipe-path recipe.json
-
-####################################################################################################
-## Builder 
-####################################################################################################
-
-FROM chef as builder 
-
-# Create appuser
 ENV USER=krewetka
 ENV UID=10001
-
-COPY ./collector ./
 
 RUN adduser \
     --disabled-password \
@@ -28,37 +15,30 @@ RUN adduser \
 
 RUN apt-get update && apt-get install -y libzmq3-dev cmake protobuf-compiler libprotobuf-dev cmake
 
+RUN cargo new /app
+COPY Cargo.toml Cargo.lock /app/
+
+# Compiles only our dependencies and saves them in a layer
 WORKDIR /app
-COPY --from=planner /app/recipe.json recipe.json
 
-RUN cargo chef cook --release --recipe-path recipe.json
+RUN --mount=type=cache,target=/usr/local/cargo/registry cargo build --release
 
-COPY ./collector ./
-COPY proto ./proto
+# Copy source code
+COPY . /app
 ARG PROTO_PATH=/app/proto
 
-RUN cargo build --release
+RUN --mount=type=cache,target=/usr/local/cargo/registry --mount=type=cache,target=/app/target \
+  set -e \
+  touch ./src/main.rs && \
+  cargo build --release --all && \
+  mv /app/target/release/collector /app
 
-####################################################################################################
-## Final image collector
-####################################################################################################
-FROM debian:bookworm-slim as collector
+FROM debian:bookworm-slim
 
-# Import from builder.
 COPY --from=builder /etc/passwd /etc/passwd
 COPY --from=builder /etc/group /etc/group
-
-# to remove
-RUN apt-get update && apt-get install -yy curl
-#
-
-WORKDIR /app
-
-# Copy our build
-COPY --from=builder /app/target/release/collector ./collector
-
-# Use an unprivileged user.
 USER krewetka:krewetka
 
-ENV RUST_LOG="debug"
-CMD [ "/app/collector" ]
+COPY --from=builder /app/collector /collector
+
+ENTRYPOINT [ "./collector" ]
