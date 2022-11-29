@@ -1,7 +1,7 @@
 use actix_web::{App, HttpServer};
-use lib::application_state::ApplicationState;
-use lib::consts::HTTP_PORT;
-use lib::handler::healthz;
+use processor::application_state::ApplicationState;
+use processor::consts::HTTP_PORT;
+use processor::handler::healthz;
 use log::info;
 
 pub mod pb {

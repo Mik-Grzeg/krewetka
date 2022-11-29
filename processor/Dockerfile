@@ -1,21 +1,8 @@
-FROM lukemathwalker/cargo-chef:latest-rust-1.63.0 AS chef
-WORKDIR /app
+# syntax=docker/dockerfile:1.4
+FROM rust:1.65 as builder
 
-FROM chef as planner
-COPY processor .
-RUN cargo chef prepare --recipe-path recipe.json
-
-####################################################################################################
-## Builder
-####################################################################################################
-
-FROM chef as builder
-
-# Create appuser
 ENV USER=krewetka
 ENV UID=10001
-
-COPY processor ./
 
 RUN adduser \
     --disabled-password \
@@ -28,55 +15,40 @@ RUN adduser \
 
 RUN apt-get update && apt-get install -y libzmq3-dev cmake protobuf-compiler libprotobuf-dev
 
-WORKDIR /app
-COPY --from=planner /app/recipe.json recipe.json
-RUN cargo chef cook --release --recipe-path recipe.json
+RUN cargo new /app
+COPY Cargo.toml Cargo.lock /app/
 
-COPY processor ./
-COPY proto ./proto
+# Compiles only our dependencies and saves them in a layer
+WORKDIR /app
+
+RUN mkdir ./src/bin && \
+	cp ./src/main.rs ./src/bin/migrator.rs && \
+	cp ./src/main.rs ./src/bin/processor.rs && \
+	touch ./src/lib.rs
+
+RUN --mount=type=cache,target=/usr/local/cargo/registry cargo build --release --all
+
+# Copy source code
+COPY . /app
 ARG PROTO_PATH=/app/proto
 
-RUN cargo build --release
+RUN --mount=type=cache,target=/usr/local/cargo/registry --mount=type=cache,target=/app/target \
+  set -e \
+  touch ./src/lib.rs && \
+  touch ./src/bin/migrator.rs && \
+  touch ./src/bin/processor.rs && \
+  cargo build --release --all && \
+  mv /app/target/release/processor /app && \
+  mv /app/target/release/migrator /app
 
-####################################################################################################
-## Final image processor
-####################################################################################################
-FROM debian:bookworm as processor
+FROM debian:bookworm-slim
 
-# Import from builder.
 COPY --from=builder /etc/passwd /etc/passwd
 COPY --from=builder /etc/group /etc/group
-
-WORKDIR /app
-
-# Copy our build
-COPY --from=builder /app/target/release/processor ./processor
-
-# Use an unprivileged user.
 USER krewetka:krewetka
 
-ENV RUST_LOG="debug"
-CMD [ "/app/processor" ]
+COPY --from=builder /app/processor /processor
+COPY --from=builder /app/migrator /processor-migrator
+COPY --from=builder /app/src/migrator/clickhouse/migrations/ /app/migrations
 
-####################################################################################################
-## Final image migrator
-####################################################################################################
-FROM debian:bookworm-slim as migrator
-
-# Import from builder.
-COPY --from=builder /etc/passwd /etc/passwd
-COPY --from=builder /etc/group /etc/group
-
-
-WORKDIR /app
-
-COPY --from=builder /app/src/migrator/clickhouse/migrations/ ./migrations
-
-# Copy our build
-COPY --from=builder /app/target/release/migrator ./migrator
-
-# Use an unprivileged user.
-USER krewetka:krewetka
-
-ENV RUST_LOG="debug"
-CMD [ "/app/migrator", "apply", "./migrations" ]
+ENTRYPOINT [ "./processor" ]
