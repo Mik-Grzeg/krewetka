@@ -3,7 +3,7 @@ kafka:
     numPartitions: 2
     replicationFactor: 1
     enabled: true
-    topics: 
+    topics:
       - name: flows
         replicationFactor: 1
       - name: flows_retry_1
@@ -51,18 +51,7 @@ zookeeper:
 
 krewetka:
   registry:
-    url: testing-registry:35945
-
-  processor:
-    image: krewetka/processor
-    migrationJob:
-      image: krewetka/migrator
-
-  classifier:
-    image: krewetka/classifier
-
-  reporting:
-    image: krewetka/reporting
+    url: krewetka.azurecr.io
 
   config:
     clickhouse:
