@@ -28,4 +28,4 @@ jobs:
           context: ./${{matrix.app}}
           builder: ${{ steps.buildx.outputs.name }}
           push: true
-          tags: ${{ matrix.app }}:dev
+          tags: krewetka.azurecr.io/${{ matrix.app }}:dev

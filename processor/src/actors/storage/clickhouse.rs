@@ -15,7 +15,7 @@ use crate::actors::messages::FlowMessageWithMetadata;
 use async_trait::async_trait;
 use std::sync::Arc;
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct ClickhouseSettings {
     host: String,
     port: u16,

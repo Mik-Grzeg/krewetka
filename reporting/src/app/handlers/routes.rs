@@ -1,6 +1,6 @@
-use crate::app::db::DbLayer;
 use super::doc::ApiDoc;
-use super::{health, flow_stats, throughput_ws};
+use super::{flow_stats, health, throughput_ws};
+use crate::app::db::DbLayer;
 use actix_web::web;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;

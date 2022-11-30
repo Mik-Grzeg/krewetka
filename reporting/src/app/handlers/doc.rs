@@ -1,5 +1,5 @@
+use super::{flow_stats, health};
 use crate::app::models::MaliciousVsNonMalicious;
-use super::{health, flow_stats};
 use utoipa::OpenApi;
 
 #[derive(OpenApi)]

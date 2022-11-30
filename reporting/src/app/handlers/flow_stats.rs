@@ -7,7 +7,6 @@ use chrono::Utc;
 use serde::Deserialize;
 use utoipa::IntoParams;
 
-
 /// Get the number of malicious and non-malicious packets
 ///
 /// Compute how many malicous and non-malicous packets were sent with given parameters

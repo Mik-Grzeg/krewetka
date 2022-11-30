@@ -4,18 +4,17 @@ use super::models::ThroughputStatusVec;
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
-use clickhouse_rs::errors::Error;
+
 use clickhouse_rs::types::Complex;
-use clickhouse_rs::types::Row;
-use clickhouse_rs::types::Simple;
+
 use clickhouse_rs::Block;
 use clickhouse_rs::Pool;
-use futures_core::stream::BoxStream;
+
 use log::{debug, info};
 use std::fmt::Display;
 use std::time::Duration;
 
-use super::models::{MaliciousVsNonMalicious};
+use super::models::MaliciousVsNonMalicious;
 
 /// Initialization of database connector
 ///

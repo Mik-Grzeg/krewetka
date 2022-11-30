@@ -1,5 +1,5 @@
 use crate::app::db::{DbAccessor, Querier};
-use crate::app::errors::AppError;
+
 use actix::prelude::*;
 use actix_web::{web, Error, HttpRequest, HttpResponse, Responder};
 use actix_web_actors::ws;
@@ -8,10 +8,9 @@ use chrono::Utc;
 use log::{info, warn};
 use serde::Deserialize;
 use serde_with::serde_as;
-use std::ops::Deref;
+
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-
 
 /// How often hearbeat ping are sent
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
@@ -70,7 +69,6 @@ impl<T: Querier + DbAccessor> ThroughputWs<T> {
     }
 
     fn fresh_data(&mut self, ctx: &mut ws::WebsocketContext<Self>) {
-
         let address = ctx.address();
         ctx.spawn(Box::pin(
             async move {
@@ -122,13 +120,7 @@ impl<T: Querier + DbAccessor> Handler<NotifyClient> for ThroughputWs<T> {
         Box::pin(
             async move {
                 let stats_vec = dl
-                    .fetch_throughput_stats(
-                        &*dl,
-                        host.as_deref(),
-                        &aggr_interval,
-                        start_time,
-                        None,
-                    )
+                    .fetch_throughput_stats(&*dl, host.as_deref(), &aggr_interval, start_time, None)
                     .await
                     .unwrap();
                 stats_vec.0
@@ -181,8 +173,6 @@ pub struct ThroughputParams {
     host: Option<String>,
 }
 
-
-
 fn default_aggr_interval() -> Duration {
     Duration::from_secs(60 * 60 * 24)
 }
@@ -208,7 +198,6 @@ pub async fn stream_throughput<T: Querier + DbAccessor>(
         stream,
     )
 }
-
 
 /// Websocket actor for live alerts
 #[derive(Debug)]
@@ -241,7 +230,6 @@ impl<T: Querier + DbAccessor> AlertWs<T> {
             init_params,
             last_fetched: None,
         }
-
     }
 
     /// helper method that sends ping to client every 5 seconds (HEARTBEAT_INTERVAL)
@@ -285,9 +273,9 @@ impl<T: Querier + DbAccessor> Handler<NotifyClient> for AlertWs<T> {
     type Result = ResponseActFuture<Self, ()>;
 
     fn handle(&mut self, _msg: NotifyClient, _ctx: &mut Self::Context) -> Self::Result {
-        let dl = self.db_layer.clone();
-        let host = self.init_params.host.clone();
-        let start_time = self.last_fetched;
+        let _dl = self.db_layer.clone();
+        let _host = self.init_params.host.clone();
+        let _start_time = self.last_fetched;
 
         Box::pin(
             async move {
@@ -305,7 +293,7 @@ impl<T: Querier + DbAccessor> Handler<NotifyClient> for AlertWs<T> {
                 // stats_vec.0
             }
             .into_actor(self)
-            .map(|res, act, ctx| {
+            .map(|_res, _act, _ctx| {
                 // Set time of the recently fetched data
                 // act.last_fetched = Some(res[res.len() - 1].get_time());
                 // let stat_parsed = serde_json::to_string_pretty(&res).unwrap();
@@ -327,9 +315,7 @@ impl<T: Querier + DbAccessor> Actor for AlertWs<T> {
 }
 
 /// Handler for the throughput statistics data
-impl<T: Querier + DbAccessor> StreamHandler<Result<ws::Message, ws::ProtocolError>>
-    for AlertWs<T>
-{
+impl<T: Querier + DbAccessor> StreamHandler<Result<ws::Message, ws::ProtocolError>> for AlertWs<T> {
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
         match msg {
             Ok(ws::Message::Ping(msg)) => {
@@ -355,10 +341,10 @@ pub async fn alerts_ws<T: Querier + DbAccessor>(
     query: web::Query<AlertsParams>,
     stream: web::Payload,
     dal: web::Data<T>,
-    ) -> impl Responder {
+) -> impl Responder {
     ws::start(
         AlertWs::new(dal.into_inner(), query.into_inner()),
         &req,
-        stream
+        stream,
     )
 }
