@@ -1,12 +1,12 @@
-use super::handlers;
-use super::models::MaliciousVsNonMalicious;
+use crate::app::models::MaliciousVsNonMalicious;
+use super::{health, flow_stats};
 use utoipa::OpenApi;
 
 #[derive(OpenApi)]
 #[openapi(
     paths(
-        handlers::get_stats,
-        handlers::healthz,
+        flow_stats::get_stats,
+        health::healthz,
     ),
     components(
         schemas(MaliciousVsNonMalicious),

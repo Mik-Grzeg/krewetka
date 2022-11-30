@@ -1,5 +1,5 @@
-use super::db::{DbAccessor, Querier};
-use super::errors::ResponderErr;
+use crate::app::db::{DbAccessor, Querier};
+use crate::app::errors::ResponderErr;
 use actix_web::{http, web, HttpResponse, Responder};
 use chrono::DateTime;
 use chrono::Utc;
@@ -7,19 +7,6 @@ use chrono::Utc;
 use serde::Deserialize;
 use utoipa::IntoParams;
 
-/// Health check endpoint
-///
-/// Checks whether the server is capable of responding to a request
-#[utoipa::path(
-    get,
-    path = "/healthz",
-    responses(
-        (status = 200, description = "Api is healthy", body = String),
-    ),
-)]
-pub async fn healthz() -> impl Responder {
-    HttpResponse::build(http::StatusCode::OK).body("OK".to_owned())
-}
 
 /// Get the number of malicious and non-malicious packets
 ///
@@ -258,7 +245,7 @@ mod tests {
     // [get_stats<T: Querier + DbAccessor>] has bounds which require that trait to be satisfied
     #[async_trait]
     impl db::Querier for CallWatcher {
-        async fn query_db<'a, T: TryFrom<Block<Complex>, Error = AppError> + 'static>(
+        async fn query_db<T: TryFrom<Block<Complex>, Error = AppError> + 'static>(
             &self,
             _query: &str,
         ) -> Result<T, AppError> {

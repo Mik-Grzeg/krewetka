@@ -49,20 +49,15 @@ pub trait Querier: Send + Sync + Clone + 'static {
     /// Arguments:
     ///
     /// * `query`: Query to execture
-    async fn query_db<T: TryFrom<Block<Complex>, Error = AppError>>(
+    async fn query_db<T: TryFrom<Block<Complex>, Error = AppError> + 'static>(
         &self,
         query: &str,
     ) -> Result<T, AppError>;
-
-    async fn stream_db_result(
-        &self,
-        query: &str,
-    ) -> Result<BoxStream<Result<Row<Simple>, Error>>, AppError>;
 }
 
 #[async_trait]
 impl Querier for DbLayer {
-    async fn query_db<T: TryFrom<Block<Complex>, Error = AppError>>(
+    async fn query_db<T: TryFrom<Block<Complex>, Error = AppError> + 'static>(
         &self,
         query: &str,
     ) -> Result<T, AppError> {
@@ -73,17 +68,6 @@ impl Querier for DbLayer {
             .await
             .map_err(AppError::from)?
             .try_into()
-    }
-
-    async fn stream_db_result(
-        &self,
-        _query: &str,
-    ) -> Result<BoxStream<Result<Row<Simple>, Error>>, AppError> {
-        unimplemented!()
-        // let mut handler = self.pool.get_handle().await?;
-        // Ok(handler
-        //     .query(query)
-        //     .stream())
     }
 }
 
@@ -196,7 +180,8 @@ pub trait DbAccessor {
             .condition(end_date.map(|v| format!("timestamp < parseDateTimeBestEffort('{v}')")))
             .prepare();
 
-        let query = format!("SELECT count() packets_per_second, toStartOfInterval(timestamp, INTERVAL {} second) time FROM messages {condition} GROUP BY time ORDER BY time ASC", interval.as_secs());
+        let interval_as_secs = interval.as_secs();
+        let query = format!("SELECT count() packets_per_second, toStartOfInterval(timestamp_add(second, {interval_as_secs}, timestamp), INTERVAL {interval_as_secs} second) time FROM messages {condition} GROUP BY time ORDER BY time ASC");
 
         debug!("Generated query: {query}");
         Ok(pool.query_db(&query).await?)
@@ -254,7 +239,7 @@ pub mod db_layer_tests {
 
         #[async_trait]
         impl Querier for DbQuerier {
-            async fn query_db<'a, T: TryFrom<Block<Complex>, Error = AppError> + 'static>(&self, query: &str) -> Result<T, AppError>;
+            async fn query_db<T: TryFrom<Block<Complex>, Error = AppError> + 'static>(&self, query: &str) -> Result<T, AppError>;
         }
 
         impl DbAccessor for DbQuerier {}
