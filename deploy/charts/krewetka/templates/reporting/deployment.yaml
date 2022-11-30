@@ -43,3 +43,6 @@ spec:
             name: {{ .Values.reporting.configMap.name }}
         - secretRef:
             name: {{ .Values.reporting.secret.name }}
+        resources:
+          limits:
+            memory: 1Gi
