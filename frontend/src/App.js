@@ -9,7 +9,7 @@ function App() {
 	const [data, setData] = useState([]);
 
 	useEffect(() => {
-		const ws = new WebSocket("ws://localhost:8080/throughput_ws");
+		const ws = new WebSocket("ws://localhost:8080/throughput");
 		ws.onopen = (event) => {
 			console.log(JSON.stringify(event))
 			console.log("[open] Connection established")
