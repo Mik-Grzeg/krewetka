@@ -30,7 +30,7 @@ impl ClickhouseMigrations {
         let file_name = path.file_name().unwrap().to_str().unwrap();
         info!("reading migration script: {}", file_name);
 
-        let ddl = match fs::read_to_string(&path) {
+        let ddl = match fs::read_to_string(path) {
             Ok(s) => s,
             Err(e) => {
                 error!("unable to read: {}", file_name);

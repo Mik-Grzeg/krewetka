@@ -1,8 +1,8 @@
 use actix_web::{App, HttpServer};
+use log::info;
 use processor::application_state::ApplicationState;
 use processor::consts::HTTP_PORT;
 use processor::handler::healthz;
-use log::info;
 
 pub mod pb {
     include!("../flow.rs");

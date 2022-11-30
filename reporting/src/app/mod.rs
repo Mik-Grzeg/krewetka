@@ -1,12 +1,11 @@
-pub mod state;
-pub mod errors;
 mod config;
 mod db;
-mod models;
+pub mod errors;
 mod handlers;
+mod models;
+pub mod state;
 
 pub use handlers::routes;
-
 
 #[cfg(test)]
 mod ws_tests;

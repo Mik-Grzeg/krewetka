@@ -6,7 +6,6 @@ use chrono::Utc;
 use chrono_tz::Tz;
 use clickhouse_rs::types::Complex;
 
-
 use clickhouse_rs::Block;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
