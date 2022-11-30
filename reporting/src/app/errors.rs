@@ -60,15 +60,6 @@ impl From<ChErr> for AppError {
 }
 
 /// Capability to convert [AppError] to [ResponderErr]
-///
-/// ```rust
-/// # use actix_web::Responder;
-/// use AppError;
-///
-/// fn handler() -> impl Responder {
-///     AppError::Unimplemented
-/// }
-/// ```
 impl From<AppError> for ResponderErr {
     fn from(e: AppError) -> Self {
         match e {
@@ -80,6 +71,7 @@ impl From<AppError> for ResponderErr {
     }
 }
 
+/// Enum which can be returned whenever the return type is [impl Responder]
 #[derive(Debug, Display, Error)]
 pub enum ResponderErr {
     #[display(fmt = "An internal error occurred. Please try again later.")]

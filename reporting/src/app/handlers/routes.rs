@@ -1,7 +1,6 @@
-use super::db::DbLayer;
+use crate::app::db::DbLayer;
 use super::doc::ApiDoc;
-use super::handlers;
-use super::ws_handlers;
+use super::{health, flow_stats, throughput_ws};
 use actix_web::web;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -10,13 +9,13 @@ pub fn routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         SwaggerUi::new("/swagger-ui/{_:.*}").url("/api-doc/openapi.json", ApiDoc::openapi()),
     );
-    cfg.route("/healthz", web::get().to(handlers::healthz));
+    cfg.route("/healthz", web::get().to(health::healthz));
     cfg.route(
         "/grouped_packets_number",
-        web::get().to(handlers::get_stats::<DbLayer>),
+        web::get().to(flow_stats::get_stats::<DbLayer>),
     );
     cfg.route(
         "/throughput",
-        web::get().to(ws_handlers::throughput_ws::<DbLayer>),
+        web::get().to(throughput_ws::stream_throughput::<DbLayer>),
     );
 }
