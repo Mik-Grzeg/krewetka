@@ -172,15 +172,15 @@ pub trait DbAccessor {
         //
         //
         // select count(), toStartOfInterval(timestamp, INTERVAL 15 second) intervals, dateDiff('hour', intervals, now()) since_then from messages where since_then < 20514 group by intervals order by intervals
+        let interval_as_secs = interval.as_secs();
 
         let condition = QueryCondition::new()
             .condition(host.map(|v| format!("host = '{v}'")))
             .condition(start_date.map(|v| format!("timestamp >= parseDateTimeBestEffort('{v}')")))
-            .condition(end_date.map(|v| format!("timestamp < parseDateTimeBestEffort('{v}')")))
+            .condition(end_date.map(|v| format!("timestamp < toStartOfInterval(parseDateTimeBestEffort('{v}'), interval {interval_as_secs} second)")))
             .prepare();
 
-        let interval_as_secs = interval.as_secs();
-        let query = format!("SELECT count() packets_per_second, toStartOfInterval(timestamp_add(second, {interval_as_secs}, timestamp), INTERVAL {interval_as_secs} second) time FROM messages {condition} GROUP BY time ORDER BY time ASC");
+        let query = format!("SELECT toUInt64(count()/{interval_as_secs}) flows_per_second, tumbleEnd(timestamp, toIntervalSecond('{interval_as_secs}')) time FROM messages {condition} GROUP BY time ORDER BY time ASC");
 
         debug!("Generated query: {query}");
         Ok(pool.query_db(&query).await?)

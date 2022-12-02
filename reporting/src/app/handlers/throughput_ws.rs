@@ -1,3 +1,4 @@
+use super::standard_filter_query_params::StandardFilterQueryParams;
 use crate::app::db::{DbAccessor, Querier};
 
 use actix::prelude::*;
@@ -16,7 +17,7 @@ use std::time::{Duration, Instant};
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 
 /// How long before lack of client response causes a timeout
-const WS_CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
+const WS_CLIENT_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// Websocket actor for throughput statistics
 #[derive(Debug)]
@@ -54,6 +55,8 @@ impl<T: Querier + DbAccessor> ThroughputWs<T> {
     /// also this method checks heartbeats from client
     fn hb(&self, ctx: &mut ws::WebsocketContext<Self>) {
         ctx.run_interval(HEARTBEAT_INTERVAL, |act, ctx| {
+            ctx.ping(b"PING");
+
             // check client heartbeats
             if Instant::now().duration_since(act.hb) > WS_CLIENT_TIMEOUT {
                 // heartbeat timed out
@@ -63,8 +66,6 @@ impl<T: Querier + DbAccessor> ThroughputWs<T> {
                 ctx.stop();
                 return;
             }
-
-            ctx.ping(b"");
         });
     }
 
@@ -114,13 +115,26 @@ impl<T: Querier + DbAccessor> Handler<NotifyClient> for ThroughputWs<T> {
     fn handle(&mut self, _msg: NotifyClient, _ctx: &mut Self::Context) -> Self::Result {
         let dl = self.db_layer.clone();
         let aggr_interval = self.init_params.aggr_interval;
-        let host = self.init_params.host.clone();
-        let start_time = self.last_fetched;
+        let host = self.init_params.filter_params.host.clone();
+        let start_time = self
+            .last_fetched
+            .or(self.init_params.filter_params.start_period);
+        let end_time = self
+            .init_params
+            .filter_params
+            .end_period
+            .or(Some(Utc::now()));
 
         Box::pin(
             async move {
                 let stats_vec = dl
-                    .fetch_throughput_stats(&*dl, host.as_deref(), &aggr_interval, start_time, None)
+                    .fetch_throughput_stats(
+                        &*dl,
+                        host.as_deref(),
+                        &aggr_interval,
+                        start_time,
+                        end_time,
+                    )
                     .await
                     .unwrap();
                 stats_vec.0
@@ -128,7 +142,10 @@ impl<T: Querier + DbAccessor> Handler<NotifyClient> for ThroughputWs<T> {
             .into_actor(self)
             .map(|res, act, ctx| {
                 // Set time of the recently fetched data
-                act.last_fetched = Some(res[res.len() - 1].get_time());
+                if res.len() > 0 {
+                    act.last_fetched = Some(res[res.len() - 1].get_time());
+                }
+
                 let stat_parsed = serde_json::to_string_pretty(&res).unwrap();
                 ctx.text(stat_parsed);
             }),
@@ -147,6 +164,7 @@ impl<T: Querier + DbAccessor> StreamHandler<Result<ws::Message, ws::ProtocolErro
                 ctx.pong(&msg)
             }
             Ok(ws::Message::Pong(_)) => {
+                warn!("Got pong");
                 self.hb = Instant::now();
             }
             Ok(ws::Message::Text(_text)) => ctx.text("Got it"),
@@ -169,8 +187,9 @@ pub struct ThroughputParams {
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     aggr_interval: Duration,
 
-    /// Host name
-    host: Option<String>,
+    /// Standard filter query params [StandardFilterQueryParams]
+    #[serde(flatten)]
+    filter_params: StandardFilterQueryParams,
 }
 
 fn default_aggr_interval() -> Duration {
@@ -192,6 +211,8 @@ pub async fn stream_throughput<T: Querier + DbAccessor>(
     stream: web::Payload,
     dal: web::Data<T>,
 ) -> Result<HttpResponse, Error> {
+    warn!("query: {query:?}");
+
     ws::start(
         ThroughputWs::new(dal.into_inner(), query.into_inner()),
         &req,
