@@ -31,7 +31,7 @@ impl TryFrom<Block<Complex>> for ThroughputStatusVec {
                 // let time: &str =
                 let time: DateTime<Tz> = row.get("time").unwrap();
                 let time = time.with_timezone(&Utc);
-                let packets_per_second = row.get("packets_per_second").unwrap();
+                let packets_per_second = row.get("flows_per_second").unwrap();
                 ThroughputStats::new(time, packets_per_second)
             })
             .collect::<Vec<ThroughputStats>>();

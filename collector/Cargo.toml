@@ -40,10 +40,6 @@ tokio-test = "0.4.2"
 [profile.release]
 debug = 1
 
-[lib]
-name = "lib"
-path = "src/lib.rs"
-
 [[bin]]
 name = "collector"
 path = "src/main.rs"

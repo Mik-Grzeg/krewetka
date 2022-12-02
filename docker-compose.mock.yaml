@@ -6,11 +6,11 @@ services:
     ports:
       - "5561:5561"
     environment:
-      RPS: 10000
+      RPS: 1000
 
   collector:
     build:
-      dockerfile: ./collector/Dockerfile
+      context: ./collector
     depends_on:
       - importer
     environment:
@@ -20,5 +20,6 @@ services:
       KREWETKA__EXPORTER__DESTINATION: "kafka"
       KREWETKA__EXPORTER__SETTINGS__KAFKA_BROKERS: ${KAFKA_BROKERS}
       KREWETKA__EXPORTER__SETTINGS__KAFKA_TOPIC: "flows"
+      RUST_LOG: "info"
     network_mode: host
 

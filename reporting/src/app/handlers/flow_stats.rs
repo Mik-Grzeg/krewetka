@@ -1,11 +1,7 @@
+use super::standard_filter_query_params::StandardFilterQueryParams;
 use crate::app::db::{DbAccessor, Querier};
 use crate::app::errors::ResponderErr;
 use actix_web::{http, web, HttpResponse, Responder};
-use chrono::DateTime;
-use chrono::Utc;
-
-use serde::Deserialize;
-use utoipa::IntoParams;
 
 /// Get the number of malicious and non-malicious packets
 ///
@@ -23,11 +19,11 @@ use utoipa::IntoParams;
     responses(
         (status = 200, description = "Proportion found successfully", body = MaliciousVsNonMalicious),
     ),
-    params(MaliciousProportionQueryParams)
+    params(StandardFilterQueryParams)
 )]
 pub async fn get_stats<T: Querier + DbAccessor>(
     dal: web::Data<T>,
-    query: web::Query<MaliciousProportionQueryParams>,
+    query: web::Query<StandardFilterQueryParams>,
 ) -> impl Responder {
     let results = match dal
         .get_ref()
@@ -46,105 +42,6 @@ pub async fn get_stats<T: Querier + DbAccessor>(
     Ok(HttpResponse::build(http::StatusCode::OK).json(results))
 }
 
-/// Generic query parameters with host, start and end datetime
-///
-/// It implements Deserialize trait. Datetime are parsed from rfc3339 https://www.rfc-editor.org/rfc/rfc3339
-#[derive(Deserialize, IntoParams)]
-pub struct MaliciousProportionQueryParams {
-    /// Host that is used to filter records in database
-    host: Option<String>,
-
-    /// Records older than this datetime are not considered
-    #[serde(default)]
-    #[serde(deserialize_with = "date_time_format::deserialize")]
-    start_period: Option<DateTime<Utc>>,
-
-    /// Records newer than this datetime are not considered
-    #[serde(default)]
-    #[serde(deserialize_with = "date_time_format::deserialize")]
-    end_period: Option<DateTime<Utc>>,
-}
-
-/// This module implements deserialization function for [Option<DateTime<Utc>>]
-mod date_time_format {
-    use chrono::DateTime;
-    use chrono::Utc;
-    use serde::{self, Deserialize, Deserializer};
-
-    /// Deserialization to [Option<DateTime<Utc>>]
-    ///
-    /// In case of invalid format of provided [String] it will return [D::Err]
-    /// otherwise it will convert it to DateTime<Utc> parsing from rfc3339 format
-    ///
-    /// It can be using in struct attribute as such:
-    /// ```rust,ignore
-    /// #[derive(Deserialize)]
-    /// struct DeserializeOptionDtUtc {
-    ///     #[serde(deserialize_with = "deserialize")]
-    ///     #[serde(default)]
-    ///     dt: Option<DateTime<Utc>>,
-    /// }
-    /// ```
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<DateTime<Utc>>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s: Option<String> = Option::deserialize(deserializer)?;
-        if let Some(s) = s {
-            return Ok(Some(
-                DateTime::parse_from_rfc3339(&s)
-                    .map(DateTime::<Utc>::from)
-                    .map_err(serde::de::Error::custom)?,
-            ));
-        }
-        Ok(None)
-    }
-
-    #[cfg(test)]
-    mod tests {
-        use super::super::tests::generate_utc_date;
-        use super::*;
-        use pretty_assertions::assert_eq;
-        use test_case::case;
-        use urlencoding::encode;
-
-        // Structure created solely for the purpose of testing
-        #[derive(Deserialize)]
-        struct StructToTestDeserialization {
-            #[serde(default)]
-            #[serde(deserialize_with = "deserialize")]
-            dt: Option<DateTime<Utc>>,
-        }
-
-        fn generate_url_encoded_datetime(dt: &str) -> String {
-            format!("dt={}", encode(dt))
-        }
-
-        // Testing whether parsing query string is implemented correctly
-        //
-        // It invokes deserialization function and then asserts it equals to the expected outcome
-        #[case(&generate_url_encoded_datetime("2022-12-12T10:00:00Z"), Some(generate_utc_date(2022, 12, 12, 10, 0, 0)); "deserialize UTC datetime")]
-        #[case(&generate_url_encoded_datetime("2022-12-12T10:00:00+07:00"), Some(generate_utc_date(2022, 12, 12, 3, 0, 0)); "deserialize shifted datetime")]
-        #[case("", None; "deserialize missing value")]
-        fn test_deserialization_correct_values(to_deser: &str, expect: Option<DateTime<Utc>>) {
-            let obj: StructToTestDeserialization = serde_qs::from_str(to_deser).unwrap();
-
-            assert_eq!(expect, obj.dt)
-        }
-
-        // Testing case when we can not parse the string
-        // because of the invalid format of the datetime
-        #[test]
-        fn test_deserialization_should_fail() {
-            let to_deser = generate_url_encoded_datetime("2022-13-12T10:00:00+07:00");
-            let result: Result<StructToTestDeserialization, serde_qs::Error> =
-                serde_qs::from_str(&to_deser);
-
-            assert_eq!(true, result.is_err())
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -154,6 +51,7 @@ mod tests {
     use crate::app::errors::AppError;
 
     use super::*;
+    use crate::app::handlers::standard_filter_query_params::date_time_format::dt_tests::generate_utc_date;
     use crate::app::models::MaliciousVsNonMalicious;
     use actix_web::{
         dev::Service,
@@ -161,7 +59,9 @@ mod tests {
         test, web, App, Error,
     };
     use async_trait::async_trait;
-    use chrono::NaiveDate;
+
+    use chrono::DateTime;
+    use chrono::Utc;
     use clickhouse_rs::types::Complex;
     use clickhouse_rs::Block;
     use pretty_assertions::assert_eq;
@@ -169,16 +69,6 @@ mod tests {
     use std::sync::Mutex;
     use test_case::case;
     use urlencoding::encode;
-
-    pub fn generate_utc_date(y: i32, m: u32, d: u32, hh: u32, mm: u32, ss: u32) -> DateTime<Utc> {
-        DateTime::<Utc>::from_utc(
-            NaiveDate::from_ymd_opt(y, m, d)
-                .unwrap()
-                .and_hms_opt(hh, mm, ss)
-                .unwrap(),
-            Utc,
-        )
-    }
 
     /// Helper structure which allows to monitor and ensure
     /// that a mocked method is called with expected arguments

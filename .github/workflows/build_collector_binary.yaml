@@ -38,9 +38,5 @@ jobs:
       - name: Install cross
         run: cargo install --git https://github.com/cross-rs/cross.git --rev 6dbdac10d8a6dd3715c06b9b5d20ccab996d0fd7 cross
 
-      - name: Copy protobuf files
-        run: |
-          cp -r ./proto ./collector/
-
       - name: Build
         run: cross build --target ${{ matrix.target }} --manifest-path=./collector/Cargo.toml
