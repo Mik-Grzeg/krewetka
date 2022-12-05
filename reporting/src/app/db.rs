@@ -1,6 +1,7 @@
 use super::config::Settings;
 use super::errors::AppError;
 use super::models::ThroughputStatusVec;
+use super::models::VecOfFlowMessages;
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
@@ -141,6 +142,32 @@ impl Display for QueryCondition {
 /// Trait responsible for essential executing essential queries in the database
 #[async_trait]
 pub trait DbAccessor {
+    /// Based on input arguments, it gets flows details
+    ///
+    /// Arguments:
+    ///
+    /// * `host`: Host indentifier
+    /// * `start_date`: Ignores packets with datetime earlier than this
+    /// * `end_date`: Ignores packets with datetime later than this
+    async fn fetch_flows_detail_stats(
+        &self,
+        pool: &impl Querier,
+        host: Option<&str>,
+        start_date: Option<DateTime<Utc>>,
+        end_date: Option<DateTime<Utc>>,
+    ) -> Result<VecOfFlowMessages, AppError> {
+
+        let condition = QueryCondition::new()
+            .condition(host.map(|v| format!("host = '{v}'")))
+            .condition(start_date.map(|v| format!("timestamp >= parseDateTimeBestEffort('{v}')")))
+            .prepare();
+
+        let query = format!("select * from messages {condition}");
+
+        debug!("Generated query: {query}");
+        Ok(pool.query_db(&query).await?)
+    }
+
     /// Based on input arguments, it gets throughput in specific intervals based on
     /// input parameters
     ///

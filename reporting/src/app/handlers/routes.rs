@@ -1,5 +1,5 @@
 use super::doc::ApiDoc;
-use super::{flow_stats, health, throughput_ws};
+use super::{flow_stats, health, throughput_ws, flows_details_ws};
 use crate::app::db::DbLayer;
 use actix_web::web;
 use utoipa::OpenApi;
@@ -17,5 +17,9 @@ pub fn routes(cfg: &mut web::ServiceConfig) {
     cfg.route(
         "/throughput",
         web::get().to(throughput_ws::stream_throughput::<DbLayer>),
+    );
+    cfg.route(
+        "/flows_details",
+        web::get().to(flows_details_ws::stream_flows_detail::<DbLayer>),
     );
 }
