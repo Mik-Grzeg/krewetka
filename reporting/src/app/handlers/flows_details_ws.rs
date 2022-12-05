@@ -19,9 +19,9 @@ const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 /// How long before lack of client response causes a timeout
 const WS_CLIENT_TIMEOUT: Duration = Duration::from_secs(20);
 
-/// Websocket actor for throughput statistics
+/// Websocket actor for flows_detail statistics
 #[derive(Debug)]
-struct ThroughputWs<T: Querier + DbAccessor + 'static> {
+struct FlowsDetailWs<T: Querier + DbAccessor + 'static> {
     /// Client must send ping at least once per 10 seconds (CLIENT_TIMEOUT),
     /// otherwise the connection is dropped
     pub hb: Instant,
@@ -30,7 +30,7 @@ struct ThroughputWs<T: Querier + DbAccessor + 'static> {
     pub db_layer: Arc<T>,
 
     /// Query parameters
-    init_params: ThroughputParams,
+    init_params: FlowDetailsParams,
 
     /// State of the already fetched data - [DateTime<Utc>]
     last_fetched: Option<DateTime<Utc>>,
@@ -40,8 +40,8 @@ struct ThroughputWs<T: Querier + DbAccessor + 'static> {
 #[rtype(result = "()")]
 struct NotifyClient;
 
-impl<T: Querier + DbAccessor> ThroughputWs<T> {
-    pub fn new(dl: Arc<T>, init_params: ThroughputParams) -> Self {
+impl<T: Querier + DbAccessor> FlowsDetailWs<T> {
+    pub fn new(dl: Arc<T>, init_params: FlowDetailsParams) -> Self {
         Self {
             hb: Instant::now() - HEARTBEAT_INTERVAL,
             db_layer: dl,
@@ -98,7 +98,7 @@ impl<T: Querier + DbAccessor> ThroughputWs<T> {
     }
 }
 
-impl<T: Querier + DbAccessor> Actor for ThroughputWs<T> {
+impl<T: Querier + DbAccessor> Actor for FlowsDetailWs<T> {
     type Context = ws::WebsocketContext<Self>;
 
     /// Method is called on actor start. The heartbeat process is started here.
@@ -109,12 +109,11 @@ impl<T: Querier + DbAccessor> Actor for ThroughputWs<T> {
     }
 }
 
-impl<T: Querier + DbAccessor> Handler<NotifyClient> for ThroughputWs<T> {
+impl<T: Querier + DbAccessor> Handler<NotifyClient> for FlowsDetailWs<T> {
     type Result = ResponseActFuture<Self, ()>;
 
     fn handle(&mut self, _msg: NotifyClient, _ctx: &mut Self::Context) -> Self::Result {
         let dl = self.db_layer.clone();
-        let aggr_interval = self.init_params.aggr_interval;
         let host = self.init_params.filter_params.host.clone();
         let start_time = self
             .last_fetched
@@ -128,10 +127,9 @@ impl<T: Querier + DbAccessor> Handler<NotifyClient> for ThroughputWs<T> {
         Box::pin(
             async move {
                 let stats_vec = dl
-                    .fetch_throughput_stats(
+                    .fetch_flows_detail_stats(
                         &*dl,
                         host.as_deref(),
-                        &aggr_interval,
                         start_time,
                         end_time,
                     )
@@ -141,9 +139,10 @@ impl<T: Querier + DbAccessor> Handler<NotifyClient> for ThroughputWs<T> {
             }
             .into_actor(self)
             .map(|res, act, ctx| {
+                info!("res: {res:?}");
                 // Set time of the recently fetched data
                 if res.len() > 0 {
-                    act.last_fetched = Some(res[res.len() - 1].get_time()); // @todo should take
+                    act.last_fetched = Some(res[res.len() - 1].timestamp); // @todo should take
                                                                             // into consideration
                                                                             // last minute (should
                                                                             // not be set as
@@ -158,9 +157,9 @@ impl<T: Querier + DbAccessor> Handler<NotifyClient> for ThroughputWs<T> {
     }
 }
 
-/// Handler for the throughput statistics data
+/// Handler for the flows_detail statistics data
 impl<T: Querier + DbAccessor> StreamHandler<Result<ws::Message, ws::ProtocolError>>
-    for ThroughputWs<T>
+    for FlowsDetailWs<T>
 {
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
         match msg {
@@ -169,7 +168,6 @@ impl<T: Querier + DbAccessor> StreamHandler<Result<ws::Message, ws::ProtocolErro
                 ctx.pong(&msg)
             }
             Ok(ws::Message::Pong(_)) => {
-                warn!("Got pong");
                 self.hb = Instant::now();
             }
             Ok(ws::Message::Text(_text)) => ctx.text("Got it"),
@@ -186,11 +184,7 @@ impl<T: Querier + DbAccessor> StreamHandler<Result<ws::Message, ws::ProtocolErro
 /// Handler possible query parameters
 #[serde_with::serde_as]
 #[derive(Deserialize, Debug)]
-pub struct ThroughputParams {
-    /// Interval aggregation of the data in seconds
-    #[serde(default = "default_aggr_interval")]
-    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
-    aggr_interval: Duration,
+pub struct FlowDetailsParams {
 
     /// Standard filter query params [StandardFilterQueryParams]
     #[serde(flatten)]
@@ -210,16 +204,16 @@ fn default_aggr_interval() -> Duration {
 //     ),
 //     params(MaliciousProportionQueryParams)
 // )]
-pub async fn stream_throughput<T: Querier + DbAccessor>(
+pub async fn stream_flows_detail<T: Querier + DbAccessor>(
     req: HttpRequest,
-    query: web::Query<ThroughputParams>,
+    query: web::Query<FlowDetailsParams>,
     stream: web::Payload,
     dal: web::Data<T>,
 ) -> Result<HttpResponse, Error> {
     warn!("query: {query:?}");
 
     ws::start(
-        ThroughputWs::new(dal.into_inner(), query.into_inner()),
+        FlowsDetailWs::new(dal.into_inner(), query.into_inner()),
         &req,
         stream,
     )

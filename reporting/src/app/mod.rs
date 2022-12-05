@@ -3,6 +3,7 @@ mod db;
 pub mod errors;
 mod handlers;
 mod models;
+mod utils;
 pub mod state;
 
 pub use handlers::routes;
