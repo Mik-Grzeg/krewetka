@@ -1,5 +1,5 @@
 use super::doc::ApiDoc;
-use super::{flow_stats, health, throughput_ws, flows_details_ws};
+use super::{flow_stats, flows_details_ws, health, throughput_ws};
 use crate::app::db::DbLayer;
 use actix_web::web;
 use utoipa::OpenApi;

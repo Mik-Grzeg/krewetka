@@ -24,4 +24,3 @@ pub struct StandardFilterQueryParams {
     #[serde(deserialize_with = "date_time_format::deserialize")]
     pub end_period: Option<DateTime<Utc>>,
 }
-

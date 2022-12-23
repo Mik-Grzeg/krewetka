@@ -2,7 +2,7 @@ use super::standard_filter_query_params::StandardFilterQueryParams;
 use crate::app::db::{DbAccessor, Querier};
 
 use actix::prelude::*;
-use actix_web::{web, Error, HttpRequest, HttpResponse, Responder};
+use actix_web::{web, Error, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
 use chrono::DateTime;
 use chrono::Utc;
@@ -202,14 +202,6 @@ fn default_aggr_interval() -> Duration {
 }
 
 /// Handler to initialize websocket
-// #[utoipa::path(
-//     get,
-//     path = "/grouped_packets_number",
-//     responses(
-//         (status = 200, description = "Proportion found successfully", body = MaliciousVsNonMalicious),
-//     ),
-//     params(MaliciousProportionQueryParams)
-// )]
 pub async fn stream_throughput<T: Querier + DbAccessor>(
     req: HttpRequest,
     query: web::Query<ThroughputParams>,
