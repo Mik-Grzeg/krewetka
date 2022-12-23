@@ -85,7 +85,7 @@ function PieCharts() {
     let isMounted = true;
 
     function get_data() {
-      return fetch("http://localhost:8080/grouped_packets_number")
+      return fetch("http://krewetka.norwayeast.cloudapp.azure.com/analytics/api/v1/grouped_packets_number")
       .then(res => res.json())
       .then(
         (result) => {

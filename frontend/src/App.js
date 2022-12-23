@@ -9,7 +9,6 @@ const fillWholeInterval = (start, aggr_interval) => {
 	let coeff = 1000 * aggr_interval
   let now = new Date()
 	var now_t = new Date(Math.floor(now.getTime() / coeff) * coeff)
-	console.log(`Checking date to ${new Date(now_t)}`)
 	var result = {}
 
 	for (let i = start.getTime(); i < now_t; i+=aggr_interval) {
@@ -27,11 +26,10 @@ function App() {
 		start_time.setMinutes(start_time.getMinutes() - 15);
 		var aggr_interval = 60;
 
-		const ws = new WebSocket(`ws://localhost:8080/throughput?start_period=${encodeURIComponent(start_time.toISOString())}&aggr_interval=${aggr_interval}`);
+		const ws = new WebSocket(`ws://krewetka.norwayeast.cloudapp.azure.com/analytics/api/v1/throughput?start_period=${encodeURIComponent(start_time.toISOString())}&aggr_interval=${aggr_interval}`);
 		ws.onopen = (event) => {
 			console.log(JSON.stringify(event))
 			console.log("[open] Connection established")
-			console.log("Sending to server")
 		};
 
 		ws.onmessage = function (event) {
@@ -41,7 +39,6 @@ function App() {
 					var coeff = 1000 * aggr_interval;
 					// var date = new Date();  //or use any other date
 					var roundedStart = new Date(Math.floor(start_time.getTime() / coeff) * coeff)
-					console.log(roundedStart)
 
 					var baseDates = fillWholeInterval(roundedStart, aggr_interval * 1000)
 
@@ -56,7 +53,6 @@ function App() {
 						}
 					})
 
-					console.log("Setting new data")
 					setData(oldData => [...oldData, ...result]);
 					start_time.setDate(roundedStart)
 				}
