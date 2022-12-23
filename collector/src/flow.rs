@@ -1,4 +1,4 @@
-#[derive(Clone, PartialEq, Eq, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FlowMessageClassBatched {
     #[prost(message, repeated, tag="1")]
     pub classifications: ::prost::alloc::vec::Vec<FlowMessageClass>,
@@ -8,7 +8,7 @@ pub struct FlowMessageBatched {
     #[prost(message, repeated, tag="1")]
     pub messages: ::prost::alloc::vec::Vec<FlowMessage>,
 }
-#[derive(Clone, PartialEq, Eq, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FlowMessageClass {
     #[prost(bool, tag="1")]
     pub malicious: bool,

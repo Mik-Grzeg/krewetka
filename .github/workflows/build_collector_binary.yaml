@@ -1,6 +1,6 @@
 name: build_collector_binary
 
-on: [ workflow_call ]
+on: [ push ]
 jobs:
   build_arm_binary:
     runs-on: ubuntu-latest
