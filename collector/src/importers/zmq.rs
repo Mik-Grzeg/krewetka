@@ -103,7 +103,7 @@ mod tests {
     use mockall::mock;
     use pretty_assertions::assert_eq;
     use serde_json::error::Category;
-    
+
     use test_case::case;
     use tokio_test::block_on;
 
