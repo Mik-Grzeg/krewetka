@@ -63,7 +63,6 @@ impl<T: Querier + DbAccessor> FlowsDetailWs<T> {
 
                 // stop actor
                 ctx.stop();
-                
             }
         });
     }

@@ -64,7 +64,6 @@ impl<T: Querier + DbAccessor> ThroughputWs<T> {
 
                 // stop actor
                 ctx.stop();
-                
             }
         });
     }
