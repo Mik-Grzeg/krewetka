@@ -2,3 +2,7 @@
 /deploy/charts/*.tgz
 **/krewetka.yaml
 /venv
+**/.terraform.lock.hcl
+**/.terraform
+**/tfvars
+**/terraform.tfstate*
