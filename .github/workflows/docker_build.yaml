@@ -8,8 +8,7 @@ jobs:
       max-parallel: 4
       fail-fast: false
       matrix:
-        app: ["processor", "reporting", "reporting-ui", "classifier"]
-        dir: ["processor", "reporting", "frontend", "classifier"]
+        app: [{"dir": "processor", "app": "processor"}, {"dir":"reporting", "app": "processor"},{"dir": "frontend", "app": "reporting-ui"}, {"dir":"classification", "app": "classifier"}]
     steps:
       - uses: actions/checkout@v3
 

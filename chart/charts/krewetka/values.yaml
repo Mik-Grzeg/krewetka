@@ -5,7 +5,7 @@ processor:
     name: processor-secret
   replicas: 2
   image: processor
-  version: 0.0.1
+  version: latest
   livenessProbe:
     initialDelaySeconds: 3
     periodSeconds: 3
@@ -21,7 +21,7 @@ classifier:
     name: classifier-config
   replicas: 2
   image: classifier
-  version: 0.0.1
+  version: latest
 
   grpcServerPort: 50051
 
@@ -32,14 +32,14 @@ reporting:
     name: reporting-secret
   replicas: 1
   image: reporting
-  version: 0.0.1
+  version: latest
   livenessProbe:
     initialDelaySeconds: 3
     periodSeconds: 3
 
   ui:
     image: reporting-ui
-    version: 0.0.1
+    version: latest
     replicas: 1
 
 
