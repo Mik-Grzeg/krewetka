@@ -8,7 +8,6 @@ RUN npm ci
 
 ADD public ./public
 ADD src ./src
-ADD build ./build
 
 # Build the app
 RUN npm run build
