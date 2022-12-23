@@ -79,7 +79,7 @@ unsafe impl Sync for ZMQ {}
 
 #[async_trait]
 impl Import for ZMQ {
-    async fn import(&self) -> Result<FlowMessage, ImporterError> {
+    async fn import(&self) -> Result<Vec<FlowMessage>, ImporterError> {
         // instead of using nprobe there might be our collector
         // which will deserialize packets into netflow format flow message
         let received_slice = &self.subscriber.recv()?;
@@ -88,8 +88,7 @@ impl Import for ZMQ {
             "String message: {}",
             std::str::from_utf8(received_slice).unwrap()
         ); // TODO remove that
-        let msg: FlowMessage =
-            serde_json::from_slice(received_slice).map_err(ImporterError::DeserializationErr)?;
+        let msg: Vec<FlowMessage> = serde_json::from_slice(received_slice).unwrap();
 
         debug!("Imported message: {:#?}", msg); // TODO remove that
         Ok(msg)
@@ -104,6 +103,7 @@ mod tests {
     use mockall::mock;
     use pretty_assertions::assert_eq;
     use serde_json::error::Category;
+    
     use test_case::case;
     use tokio_test::block_on;
 
@@ -134,7 +134,7 @@ mod tests {
         de_error_category: Option<serde_json::error::Category>,
     ) {
         let prepared_msg = format!(
-            r#"{{"OUT_BYTES":{},"OUT_PKTS":{},"L4_DST_PORT":{},"IPV4_DST_ADDR":"{}","IPV4_SRC_ADDR":"{}","PROTOCOL":{},"L4_SRC_PORT":{},"IN_BYTES":{},"IN_PKTS":{},"L7_PROTO":{},"TCP_FLAGS":{},"FLOW_DURATION_MILLISECONDS":{}}}"#,
+            r#"[{{"OUT_BYTES":{},"OUT_PKTS":{},"L4_DST_PORT":{},"IPV4_DST_ADDR":"{}","IPV4_SRC_ADDR":"{}","PROTOCOL":{},"L4_SRC_PORT":{},"IN_BYTES":{},"IN_PKTS":{},"L7_PROTO":{},"TCP_FLAGS":{},"FLOW_DURATION_MILLISECONDS":{}}}]"#,
             out_bytes,
             out_pkts,
             l4_dst_port,
@@ -182,7 +182,7 @@ mod tests {
         let result = block_on(zmq.import());
 
         match result {
-            Ok(o) => assert_eq!(o, flow_msg),
+            Ok(o) => assert_eq!(o, vec![flow_msg]),
             Err(e) => match e {
                 ImporterError::DeserializationErr(d) => {
                     assert_eq!(Some(d.classify()), de_error_category)

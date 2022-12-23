@@ -4,7 +4,7 @@ use crate::exporters::{KafkaExporter, KafkaSettings}; // Exporter};
 use crate::importers::{Import, ZMQSettings, ZMQ};
 use serde::Deserialize;
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub enum ImporterVariants {
     #[serde(rename = "zmq")]
     ZMQ,
@@ -47,20 +47,20 @@ impl fmt::Display for ImporterVariants {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct Importer {
     pub source: ImporterVariants,
     pub settings: ImporterSettings,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct ImporterSettings {
     pub zmq_address: Option<String>,
 
     pub zmq_queue_name: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub enum ExporterVariants {
     #[serde(rename = "kafka")]
     Kafka,
@@ -94,20 +94,20 @@ impl ExporterVariants {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct Exporter {
     pub destination: ExporterVariants,
     pub settings: ExporterSettings,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct ExporterSettings {
     pub kafka_brokers: Option<String>,
 
     pub kafka_topic: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 pub struct Configuration {
     pub importer: Importer,
 
