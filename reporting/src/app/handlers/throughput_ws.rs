@@ -64,7 +64,7 @@ impl<T: Querier + DbAccessor> ThroughputWs<T> {
 
                 // stop actor
                 ctx.stop();
-                return;
+                
             }
         });
     }
@@ -142,7 +142,7 @@ impl<T: Querier + DbAccessor> Handler<NotifyClient> for ThroughputWs<T> {
             .into_actor(self)
             .map(|res, act, ctx| {
                 // Set time of the recently fetched data
-                if res.len() > 0 {
+                if !res.is_empty() {
                     act.last_fetched = Some(res[res.len() - 1].get_time()); // @todo should take
                                                                             // into consideration
                                                                             // last minute (should

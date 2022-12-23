@@ -9,7 +9,6 @@ use chrono::Utc;
 use log::{info, warn};
 use serde::Deserialize;
 
-
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -64,7 +63,7 @@ impl<T: Querier + DbAccessor> FlowsDetailWs<T> {
 
                 // stop actor
                 ctx.stop();
-                return;
+                
             }
         });
     }
@@ -136,7 +135,7 @@ impl<T: Querier + DbAccessor> Handler<NotifyClient> for FlowsDetailWs<T> {
             .map(|res, act, ctx| {
                 info!("res: {res:?}");
                 // Set time of the recently fetched data
-                if res.len() > 0 {
+                if !res.is_empty() {
                     act.last_fetched = Some(res[res.len() - 1].timestamp); // @todo should take
                                                                            // into consideration
                                                                            // last minute (should

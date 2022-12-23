@@ -51,8 +51,8 @@ mod tests {
     use crate::app::errors::AppError;
 
     use super::*;
-    use crate::app::handlers::standard_filter_query_params::date_time_format::dt_tests::generate_utc_date;
     use crate::app::models::MaliciousVsNonMalicious;
+    use crate::app::utils::date_time_format::dt_tests::generate_utc_date;
     use actix_web::{
         dev::Service,
         http::{self},
