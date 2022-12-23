@@ -5,10 +5,11 @@ jobs:
   build_docker_image:
     runs-on: ubuntu-latest
     strategy:
-      max-parallel: 3
+      max-parallel: 4
       fail-fast: false
       matrix:
-        app: ["processor", "reporting"]
+        app: ["processor", "reporting", "reporting-ui", "classifier"]
+        dir: ["processor", "reporting", "frontend", "classifier"]
     steps:
       - uses: actions/checkout@v3
 
@@ -25,7 +26,7 @@ jobs:
       - name: Build and tag image of ${{ matrix.app }}
         uses: docker/build-push-action@v3
         with:
-          context: ./${{matrix.app}}
+          context: ./${{matrix.dir}}
           builder: ${{ steps.buildx.outputs.name }}
-          push: true
-          tags: krewetka.azurecr.io/${{ matrix.app }}:dev
+          push: ${{ github.ref == 'refs/heads/master' }}
+          tags: krewetka.azurecr.io/${{ matrix.app }}:latest
