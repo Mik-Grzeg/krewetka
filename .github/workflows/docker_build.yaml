@@ -8,7 +8,7 @@ jobs:
       max-parallel: 4
       fail-fast: false
       matrix:
-        app: [{"dir": "processor", "app": "processor"}, {"dir":"reporting", "app": "processor"},{"dir": "frontend", "app": "reporting-ui"}, {"dir":"classification", "app": "classifier"}]
+        dir_app_pairs: [{"dir": "processor", "app": "processor"}, {"dir":"reporting", "app": "reporting"},{"dir": "frontend", "app": "reporting-ui"}, {"dir":"classification", "app": "classifier"}]
     steps:
       - uses: actions/checkout@v3
 
@@ -22,10 +22,10 @@ jobs:
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_TOKEN }}
 
-      - name: Build and tag image of ${{ matrix.app }}
+      - name: Build and tag image of ${{ matrix.dir_app_pairs }}
         uses: docker/build-push-action@v3
         with:
-          context: ./${{matrix.dir}}
+          context: ./${{matrix.dir_app_pairs.dir}}
           builder: ${{ steps.buildx.outputs.name }}
           push: ${{ github.ref == 'refs/heads/master' }}
-          tags: krewetka.azurecr.io/${{ matrix.app }}:latest
+          tags: krewetka.azurecr.io/${{ matrix.dir_app_pairs.app }}:latest
