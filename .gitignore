@@ -2,7 +2,12 @@
 /deploy/charts/*.tgz
 **/krewetka.yaml
 /venv
+
+# terraform stuff
 **/.terraform.lock.hcl
 **/.terraform
 **/tfvars
 **/terraform.tfstate*
+
+# helm charts in tgz
+chart/charts/*.tgz
