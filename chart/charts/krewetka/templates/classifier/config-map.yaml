@@ -1,0 +1,12 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.classifier.configMap.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: classifier
+    {{- include "krewetka.labels" . | nindent 4 }}
+data:
+  GRPC_SERVER_PORT: {{ .Values.classifier.grpcServerPort | quote}}
+

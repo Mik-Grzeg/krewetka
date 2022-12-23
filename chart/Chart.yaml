@@ -1,0 +1,25 @@
+apiVersion: v2
+name: krewetka-platform
+version: 0.0.1
+appVersion: 0.0.1
+description: Installs kafka, zookeeper, clickhouse, grafana stack and krewetka
+type: application
+
+dependencies:
+  - name: kafka
+    repository: https://charts.bitnami.com/bitnami
+    version: 18.3.1
+  - name: krewetka
+    version: 0.0.1
+  - name: clickhouse
+    version: 1.0.3
+    repository: https://charts.bitnami.com/bitnami
+  - name: zookeeper
+    version: 10.2.4
+    repository: https://charts.bitnami.com/bitnami
+  - name: ingress-nginx
+    version: 4.4.0
+    repository: https://kubernetes.github.io/ingress-nginx
+  - name: kube-prometheus-stack
+    version: 42.2.0
+    repository: https://prometheus-community.github.io/helm-charts

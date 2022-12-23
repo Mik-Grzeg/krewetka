@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-reporting-ui
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: {{ .Values.dns }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: reporting-ui-svc
+                port:
+                  number: 3000

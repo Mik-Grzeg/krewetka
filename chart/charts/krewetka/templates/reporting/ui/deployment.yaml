@@ -1,0 +1,37 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reporting-ui
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: reporting-ui
+    {{- include "krewetka.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.reporting.ui.replicas | int }}
+  selector:
+    matchLabels:
+      app: reporting-ui
+      {{- include "krewetka.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: reporting-ui
+        {{- include "krewetka.selectorLabels" . | nindent 8 }}
+    spec:
+      imagePullSecrets:
+        - name: {{ .Values.registry.imagePullSecrets }}
+      containers:
+      - name: ui
+        image: "{{ .Values.registry.url }}/{{ .Values.reporting.ui.image }}:{{ .Values.reporting.ui.version }}"
+        imagePullPolicy: {{ .Values.imagePullPolicy }}
+        ports:
+        - containerPort: 3000
+          name: http
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 999
+        resources:
+          limits:
+            memory: 100Mi

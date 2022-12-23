@@ -1,0 +1,87 @@
+kafka:
+  provisioning:
+    numPartitions: 2
+    replicationFactor: 1
+    enabled: true
+    topics:
+      - name: flows
+        replicationFactor: 1
+      - name: flows_retry_1
+        replicationFactor: 1
+      - name: flows_retry_2
+        replicationFactor: 1
+      - name: flows_dead_letter_queue
+        replicationFactor: 1
+
+    parallel: 5
+  externalAccess:
+    enabled: true
+    service:
+      type: LoadBalancer
+      annotations:
+        service.beta.kubernetes.io/azure-load-balancer-resource-group: krewetka
+
+      # it has to be passed from terraform output command
+      loadBalancerIPs:
+      ports:
+        external: 9094
+    autoDiscovery:
+      enabled: true
+  serviceAccount:
+    create: true
+  rbac:
+    create: true
+  zookeeper:
+    enabled: false
+  externalZookeeper:
+    servers:
+      - "zookeeper.krewetka.svc.cluster.local"
+  fullnameOverride: kafka
+
+clickhouse:
+  fullnameOverride: clickhouse
+  zookeeper:
+    enabled: false
+  externalZookeeper.servers:
+    servers:
+      - "zookeeper.krewetka.svc.cluster.local"
+  auth:
+    username: change-me # change username of clickhouse
+    password: change-me # change password for the clickhouse user
+  shards: 1
+  replicaCount: 1
+
+zookeeper:
+  fullnameOverride: zookeeper
+
+kube-prometheus-stack:
+  fullnameOverride: monitoring
+
+krewetka:
+  registry:
+    url: krewetka.azurecr.io
+
+  config:
+    clickhouse:
+      user: change-me
+      password: change-me # TODO sealed secrets
+      port: 9000
+      host: clickhouse.krewetka.svc.cluster.local
+
+    kafka:
+      brokers: "kafka.krewetka.svc.cluster.local:9092"
+      topic: flows
+
+    classifier:
+      port: 50051
+      host: classifier-svc
+
+ingress-nginx:
+  controller:
+    service:
+      # it has to be passed from terraform output command
+      loadBalancerIP:
+      annotations:
+        service.beta.kubernetes.io/azure-load-balancer-resource-group: krewetka
+
+dns: krewetka.norwayeast.cloudapp.azure.com
