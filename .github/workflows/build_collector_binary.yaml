@@ -40,3 +40,10 @@ jobs:
 
       - name: Build
         run: cross build --target ${{ matrix.target }} --manifest-path=./collector/Cargo.toml
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v3
+        if: ${{ github.ref == 'refs/heads/master' }}
+        with:
+          name: collector
+          path: target/armv7-unknown-linux-gnueabihf/release/collector
