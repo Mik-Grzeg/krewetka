@@ -2,13 +2,13 @@ use super::standard_filter_query_params::StandardFilterQueryParams;
 use crate::app::db::{DbAccessor, Querier};
 
 use actix::prelude::*;
-use actix_web::{web, Error, HttpRequest, HttpResponse, Responder};
+use actix_web::{web, Error, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
 use chrono::DateTime;
 use chrono::Utc;
 use log::{info, warn};
 use serde::Deserialize;
-use serde_with::serde_as;
+
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -127,12 +127,7 @@ impl<T: Querier + DbAccessor> Handler<NotifyClient> for FlowsDetailWs<T> {
         Box::pin(
             async move {
                 let stats_vec = dl
-                    .fetch_flows_detail_stats(
-                        &*dl,
-                        host.as_deref(),
-                        start_time,
-                        end_time,
-                    )
+                    .fetch_flows_detail_stats(&*dl, host.as_deref(), start_time, end_time)
                     .await
                     .unwrap();
                 stats_vec.0
@@ -143,11 +138,11 @@ impl<T: Querier + DbAccessor> Handler<NotifyClient> for FlowsDetailWs<T> {
                 // Set time of the recently fetched data
                 if res.len() > 0 {
                     act.last_fetched = Some(res[res.len() - 1].timestamp); // @todo should take
-                                                                            // into consideration
-                                                                            // last minute (should
-                                                                            // not be set as
-                                                                            // fetched if the
-                                                                            // minute has not ended)
+                                                                           // into consideration
+                                                                           // last minute (should
+                                                                           // not be set as
+                                                                           // fetched if the
+                                                                           // minute has not ended)
                 }
 
                 let stat_parsed = serde_json::to_string_pretty(&res).unwrap();
@@ -185,7 +180,6 @@ impl<T: Querier + DbAccessor> StreamHandler<Result<ws::Message, ws::ProtocolErro
 #[serde_with::serde_as]
 #[derive(Deserialize, Debug)]
 pub struct FlowDetailsParams {
-
     /// Standard filter query params [StandardFilterQueryParams]
     #[serde(flatten)]
     filter_params: StandardFilterQueryParams,
@@ -196,14 +190,6 @@ fn default_aggr_interval() -> Duration {
 }
 
 /// Handler to initialize websocket
-// #[utoipa::path(
-//     get,
-//     path = "/grouped_packets_number",
-//     responses(
-//         (status = 200, description = "Proportion found successfully", body = MaliciousVsNonMalicious),
-//     ),
-//     params(MaliciousProportionQueryParams)
-// )]
 pub async fn stream_flows_detail<T: Querier + DbAccessor>(
     req: HttpRequest,
     query: web::Query<FlowDetailsParams>,

@@ -1,0 +1,176 @@
+asyncapi: '2.5.0'
+id: 'tag:stream.gitter.im,2022:api'
+info:
+  title: Reporting Streaming API
+  version: '0.0.1'
+
+servers:
+  public:
+    url: ws://krewetka.norwayeast.cloudapp.azure.com/analytics/v1
+    protocol: ws
+
+channels:
+  /throughput:
+    parameters:
+      aggr_interval:
+        description: Aggregation interval in seconds
+        schema:
+          default: 86400
+          required: []
+          type: integer
+          examples:
+            - 600
+      host:
+        description: Host that the statistics will be generated for
+        schema:
+          required: ["host1"]
+          type: string
+          examples:
+            - raspberrypi-5.10.103-v7l+
+      start_period:
+        description: Starting datetime that statistics will be generated from
+        schema:
+          type: string
+          format: date-time
+          examples:
+            - 2022-11-13T20:20:39+00:00
+      end_period:
+        description: Ending datetime that statistics will be generated to
+        schema:
+          type: string
+          format: date-time
+          examples:
+            - 2022-11-13T22:20:39+00:00
+    subscribe:
+      operationId: getStats
+      message:
+        oneOf:
+          - $ref: '#/components/messages/stats'
+  /flows_details:
+    parameters:
+      host:
+        description: Host that the statistics will be generated for
+        schema:
+          required: ["host1"]
+          type: string
+          examples:
+            - raspberrypi-5.10.103-v7l+
+      start_period:
+        description: Starting datetime that statistics will be generated from
+        schema:
+          type: string
+          format: date-time
+          examples:
+            - 2022-11-13T20:20:39+00:00
+      end_period:
+        description: Ending datetime that statistics will be generated to
+        schema:
+          type: string
+          format: date-time
+          examples:
+            - 2022-11-13T22:20:39+00:00
+    subscribe:
+      operationId: getFlows
+      message:
+        oneOf:
+          - $ref: '#/components/messages/flows'
+
+components:
+  messages:
+    stats:
+      description: Statistics sent from server to client
+      payload:
+        type: array
+        items:
+          type: object
+          properties:
+            time:
+              description: Time of the start of aggregation 
+              type: string
+              format: date-time
+              examples:
+                - 2022-11-13T22:20:00+00:00
+                - 2022-11-14T22:20:00+00:00
+            packets_per_second:
+              description: Packets per second
+              type: integer
+              examples:
+                - 532
+                - 551
+    flows:
+      description: Details of the flow messages
+      payload:
+        type: array
+        items:
+          type: object
+          properties:
+            host: 
+              type: string
+              examples: 
+                - raspberrypi-5.10.103-v7l+
+            malicious:
+              type: boolean
+            timestamp:
+              type: string
+              format: date-time
+              examples: 
+                - 2022-11-14T22:20:00+00:00
+            out_bytes: 
+              type: integer
+              minimum: 0
+              examples:
+                - 1123
+            in_bytes:
+              type: integer
+              minimum: 0
+              examples:
+                - 91
+            out_pkts: 
+              type: integer
+              minimum: 0
+              examples:
+                - 11
+            in_pkts:
+              type: integer
+              minimum: 0
+              examples:
+                - 3
+            ipv4_src_addr:
+              type: string
+              format: ipv4
+              examples:
+                - 192.92.29.103
+            ipv4_dst_addr:
+              type: string
+              format: ipv4
+              examples:
+                - 160.219.148.168
+            l7_proto:
+              type: number
+              examples:
+                - 33212
+            l4_dst_port:
+              type: integer
+              minimum: 0
+              examples:
+                - 12
+            l4_src_port:
+              type: integer
+              minimum: 0
+              examples:
+                - 8
+            flow_duration_milliseconds:
+              type: integer
+              minimum: 0
+              examples:
+                - 431
+            protocol:
+              type: integer
+              minimum: 0
+              examples:
+                - 331
+            tcp_flags:
+              type: integer
+              minimum: 0
+              examples:
+                - 13

@@ -154,15 +154,14 @@ pub trait DbAccessor {
         pool: &impl Querier,
         host: Option<&str>,
         start_date: Option<DateTime<Utc>>,
-        end_date: Option<DateTime<Utc>>,
+        _end_date: Option<DateTime<Utc>>,
     ) -> Result<VecOfFlowMessages, AppError> {
-
         let condition = QueryCondition::new()
             .condition(host.map(|v| format!("host = '{v}'")))
             .condition(start_date.map(|v| format!("timestamp >= parseDateTimeBestEffort('{v}')")))
             .prepare();
 
-        let query = format!("select * from messages {condition}");
+        let query = format!("select * from messages {condition} limit 1000");
 
         debug!("Generated query: {query}");
         Ok(pool.query_db(&query).await?)
