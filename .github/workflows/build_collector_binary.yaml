@@ -38,12 +38,16 @@ jobs:
       - name: Install cross
         run: cargo install --git https://github.com/cross-rs/cross.git --rev 6dbdac10d8a6dd3715c06b9b5d20ccab996d0fd7 cross
 
+      - name: Setup upterm session
+        uses: lhotari/action-upterm@v1
+
       - name: Build
-        run: cross build --target ${{ matrix.target }} --manifest-path=./collector/Cargo.toml
+        working-directory: collector
+        run: cross build --target ${{ matrix.target }} --release
 
       - name: Upload binary
         uses: actions/upload-artifact@v3
         if: ${{ github.ref == 'refs/heads/master' }}
         with:
           name: collector
-          path: target/armv7-unknown-linux-gnueabihf/release/collector
+          path: ./collector/target/armv7-unknown-linux-gnueabihf/release/collector
