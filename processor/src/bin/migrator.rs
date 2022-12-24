@@ -1,4 +1,4 @@
-use lib::migrator::cli::ActionRunner;
+use processor::migrator::cli::ActionRunner;
 
 use std::error::Error;
 

@@ -1,10 +1,14 @@
 mod config;
-pub mod db;
-mod doc;
+mod db;
 pub mod errors;
 mod handlers;
 mod models;
-mod router;
 pub mod state;
+mod utils;
 
-pub use router::routes;
+pub use handlers::routes;
+
+#[cfg(test)]
+mod ws_tests;
+
+pub use db::init as db_init;

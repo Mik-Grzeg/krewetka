@@ -1,54 +1,26 @@
-FROM lukemathwalker/cargo-chef:latest-rust-1.63.0 AS chef
+# syntax=docker/dockerfile:1.4
+
+FROM rust:1.65 as builder
+
+RUN cargo new /app
+COPY Cargo.toml Cargo.lock /app/
+
+# Compiles only our dependencies and saves them in a layer
 WORKDIR /app
+RUN --mount=type=cache,target=/usr/local/cargo/registry cargo build --release
 
-FROM chef as planner
-COPY reporting .
-RUN cargo chef prepare --recipe-path recipe.json
+# Copy source code
+COPY . /app
 
-####################################################################################################
-## Builder
-####################################################################################################
+RUN --mount=type=cache,target=/usr/local/cargo/registry --mount=type=cache,target=/app/target \
+  set -e \
+  touch src/main.rs && \
+  cargo build --release && \
+  mv /app/target/release/reporting /app
 
-FROM chef as builder
+FROM debian:buster-slim as app
+COPY --from=builder /app/reporting /reporting
+CMD ["./reporting"]
 
-# Create appuser
-ENV USER=krewetka
-ENV UID=10001
 
-COPY reporting ./
-
-RUN adduser \
-    --disabled-password \
-    --gecos "" \
-    --home "/nonexistent" \
-    --shell "/sbin/nologin" \
-    --no-create-home \
-    --uid "${UID}" \
-    "${USER}"
-
-WORKDIR /app
-COPY --from=planner /app/recipe.json recipe.json
-RUN cargo chef cook --release --recipe-path recipe.json
-
-RUN cargo build --release
-
-####################################################################################################
-## Final image reporting
-####################################################################################################
-FROM debian:bookworm as reporting
-
-# Import from builder.
-COPY --from=builder /etc/passwd /etc/passwd
-COPY --from=builder /etc/group /etc/group
-
-WORKDIR /app
-
-# Copy our build
-COPY --from=builder /app/target/release/reporting ./reporting
-
-# Use an unprivileged user.
-USER krewetka:krewetka
-
-ENV RUST_LOG="debug"
-CMD [ "/app/reporting" ]
 

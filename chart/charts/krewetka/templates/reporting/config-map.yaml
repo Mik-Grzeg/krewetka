@@ -1,0 +1,14 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.reporting.configMap.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: reporting
+    {{- include "krewetka.labels" . | nindent 4 }}
+data:
+  KREWETKA__CLICKHOUSE_HOST: {{ .Values.config.clickhouse.host | quote }}
+  KREWETKA__CLICKHOUSE_PORT: {{ .Values.config.clickhouse.port | quote}}
+  RUST_LOG: {{ .Values.reporting.logLevel | quote | default "info"}}
+

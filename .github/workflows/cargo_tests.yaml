@@ -36,25 +36,21 @@ jobs:
             ${{ runner.os }}-cargo-target
 
       - name: Check
-        uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --manifest-path ./${{ matrix.app }}/Cargo.toml
+        working-directory: ${{ matrix.app }}
+        run: |
+          cargo check
 
       - name: Test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --verbose --manifest-path ./${{ matrix.app }}/Cargo.toml
+        working-directory: ${{ matrix.app }}
+        run: |
+          cargo test
 
       - name: Clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --manifest-path ./${{ matrix.app }}/Cargo.toml
+        working-directory: ${{ matrix.app }}
+        run: |
+          cargo clippy
 
       - name: Fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all --manifest-path ./${{ matrix.app }}/Cargo.toml -- --check
+        working-directory: ${{ matrix.app }}
+        run: |
+          cargo fmt --check --all

@@ -3,7 +3,7 @@ use super::storage_actor::{AStorage, StorageError};
 
 use crate::actors::messages::AckMessage;
 
-use chrono::{TimeZone, Utc};
+use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use clickhouse_rs::{row, types::Block, Pool};
 use futures::stream::StreamExt;
 use std::time::Duration;
@@ -15,7 +15,7 @@ use crate::actors::messages::FlowMessageWithMetadata;
 use async_trait::async_trait;
 use std::sync::Arc;
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct ClickhouseSettings {
     host: String,
     port: u16,
@@ -53,6 +53,9 @@ impl ClickhouseState {
     }
 
     fn push_to_block(block: &mut Block, f: &FlowMessageWithMetadata) -> AckMessage {
+        let ts_secs = f.metadata.timestamp / 1000;
+        let ts_ns = f.metadata.timestamp % 1000 * 1_000_000;
+
         match block.push(row! {
            host: f.metadata.host.as_str(),
            out_bytes: f.flow_message.out_bytes,
@@ -68,7 +71,7 @@ impl ClickhouseState {
            protocol:       f.flow_message.protocol,
            tcp_flags:      f.flow_message.tcp_flags,
            malicious:      f.malicious.unwrap_or(false),
-           timestamp:      Utc.timestamp(f.metadata.timestamp as i64, 0),
+           timestamp:      DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(ts_secs as i64, ts_ns as u32), Utc)
         }) {
             Ok(()) => AckMessage::Ack(f.metadata.offset.unwrap(), f.metadata.partition.unwrap()),
             Err(_e) => AckMessage::NackRetry(f.to_owned()),

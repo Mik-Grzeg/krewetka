@@ -1,7 +1,7 @@
 use crate::actors::storage::clickhouse::ClickhouseSettings;
 use serde::Deserialize;
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct ProcessorSettings {
     pub kafka_topic: String,
     pub kafka_brokers: String,
@@ -14,7 +14,7 @@ pub struct ProcessorSettings {
     pub grpc_classification_host: String,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct MigratorSettings {
     pub clickhouse_settings: ClickhouseSettings,
 }
