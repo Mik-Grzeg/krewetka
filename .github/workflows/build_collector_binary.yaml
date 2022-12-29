@@ -1,6 +1,9 @@
 name: build_collector_binary
 
-on: [ workflow_call ]
+on: 
+  push:
+    tags: ["**"]
+
 jobs:
   build_arm_binary:
     runs-on: ubuntu-latest
@@ -43,7 +46,6 @@ jobs:
 
       - name: Upload binary
         uses: actions/upload-artifact@v3
-        if: ${{ github.ref == 'refs/heads/master' }}
         with:
           name: collector
           path: target/armv7-unknown-linux-gnueabihf/release/collector
