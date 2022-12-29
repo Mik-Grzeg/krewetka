@@ -1,24 +1,96 @@
-# iot-krewetka
+# krewetka
 
 ## What's that
-It is an agent in detection system, which detect threads in a network. There is widely known format of exported data - NetFlow v9.
+This project presents a real-time intrusion detection system based on an artificial intelligence model. The purpose of this system is to detect disturbing or suspicious activities in the computer network and prevent unauthorized access to it.
 
-## This agent is responsible for:
-* consuming exported data by collector tool, in our case it is `nProbe`
-* transfroming data
-* labeling data
-* exporting it to a centralized store (initially it will be kafka, although there is nothing holding us back from implementing other exporters)
+Machine learning algorithms were used to build the system, which enabled the automatic detection of anomalies in network traffic. Thanks to this, the system is able to learn from historical data and detect new, previously unknown threats.
 
-## Configuration
+## Components
+### Local agent 
+application which can be ran on a device like raspberry pi. it relies on external tool called `nprobe`, to be more specific, on the format that the tool exports collected packets in.
 
-Currently configuration is done in yaml file and/or env variables
+* Collector is an agent responsible for receiving data in NetFlow version 9 format from nProbe exporter, which should be set to ZMQ. Captured data is sent with a host identifier to the server in a cloud via Kafka for further processing of the data.
 
-|parameter|type|description|
-|:--|:--:|:--|
-|importer.source|enum (zmq)|type of importer|
-|importer.settings.zmq_address|string|address of the zmq queue socket. *requires source to be zmq|
-|importer.settings.zmq_queue_name|string|name of the queue from where events will be imported. *requires source to be zmq|
-|exporter.destination|enum (kafka)|type of exporter|
-|exporter.kafka_brokers|string|addresses of kafka brokers in kafka format - `broker1:9092,broker2:9092` *requires destination to be kafka|
-|exporter.kafka_topic|string|kafka topic to which event will be streamed. *requires destination to be kafka|
+### Remote server
+The project as a whole is designed to be deployed on Kubernetes. It kinds of follow microservice architecture, components are decoupled. Nonetheless, some of them use the same database or depends on the other ones. Although, it does not seem to be advanced enough to require different databases.
 
+#### Services
+* Processor - the processing service responsible for reading data stream from Kafka topics. Processed data is saved to database. 
+* Reporting - an API, which queries database to acquire aggregated, transformed data. Consists of HTTP and WebSocket endpoints, which allow to stream the data to clients.
+* Classifier - gRPC server that serves to classify NetFlow messages. The outcome can be `malicious` or `non-malicious`. 
+* Reporting-UI - Component responsible for serving user interface. 
+* Kafka - serves as a data streaming platform.
+* Clickhouse - stores collected and processed data.
+* Zookeeper - required for clickhouse and kafka.
+
+#### Others
+* grafana, prometheus - observability and monitoring.
+* ingress-nginx - ingress controller for Kubernetes.
+
+## Architecture and data flow
+![arch](./media/architecture_diagram.svg)
+
+## Explanation of the folder structure in the project
+### collector
+Application for collecting data, detailed information [here](./collector/)
+### processor
+Application for processing data, detailed information [here](./processor/)
+
+### reporting
+Application for creating reports based on collected data, detailed information [here](./reporting/)
+
+### classification
+Classification application, detailed information [here](./classification/)
+
+### frontend 
+User interface application, detailed information [here](./frontend/)
+
+### charts
+This catalog includes Helm charts that are necessary to deploy the project. It highly reduced manual tuning of kubernetes templates. In best case scenario it only requires creation of docker registry secret.
+
+Detailed information [here](./charts/)
+
+### deploy
+In order to minimize necessity for manual configuration of the servers and services, terraform has been concerned to solve that. Terraform code provisions necessary resources on a Cloud. The project uses Microsoft Azure as a cloud provider.
+
+Detailed information [here](./deploy/)
+
+## Deployment instructions
+### Provision infrastructure 
+1. `cd deploy`
+2. Initialize terraform modules
+
+```bash
+terraform init
+```
+
+3. Create infrastructure
+
+```bash
+terraform apply
+```
+It requires manual input of `yes` after checking resources that are planned to be creates.
+4. Ensure that the previous command exited successfully
+5. Export public IP address of the Azure Load Balancer 
+```bash
+export PUBLIC_IP=$(terraform -chdir=../deploy output publicip)
+```
+
+### Deploy helm chart to kubernetes
+1. `cd ../chart`
+
+2. Download dependecy charts with command below, it should create few `.tgz` archives in `./charts` directory
+```bash
+helm dependency update
+```
+3. Create desired namespace (skip if already the one already exists)
+```bash
+kubectl create ns <name>
+```
+
+4. Install helm chart
+```bash
+helm install <release-name> . -f values.yaml --namespace <namespace-from-step-2> --set ingress-nginx.controller.service.loadBalancerIP=$PUBLIC_IP --set kafka.externalAccess.service.loadBalancerIPs={$PUBLIC_IP}
+```
+
+5. Inspect k8s cluster, check whether all pods and services are running(in a green state)
