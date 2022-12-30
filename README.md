@@ -70,12 +70,11 @@ Detailed information [here](./deploy/)
 terraform init
 ```
 
-3. Create infrastructure
+3. Create infrastructure, it requires manual input of `yes` after checking resources that are planned to be creates.
 
 ```bash
 terraform apply
 ```
-It requires manual input of `yes` after checking resources that are planned to be creates.
 4. Ensure that the previous command exited successfully
 5. Export public IP address of the Azure Load Balancer
 ```bash
@@ -84,7 +83,6 @@ export PUBLIC_IP=$(terraform output -raw publicip)
 6. Add kubeconfig
 ```bash
 terraform output -raw kubeconfig >> ${HOME}/.kube/config
-export KUBECONFIG=$KUBECONFIG:
 ```
 
 ### Deploy helm chart to kubernetes
