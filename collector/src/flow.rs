@@ -1,3 +1,5 @@
+use serde::{Deserializer, Deserialize};
+
 #[derive(Clone, PartialEq, Eq, ::prost::Message)]
 pub struct FlowMessageClassBatched {
     #[prost(message, repeated, tag="1")]
@@ -33,6 +35,7 @@ pub struct FlowMessage {
     pub ipv4_dst_addr: ::prost::alloc::string::String,
     /// Layer 7 protocol
     #[prost(float, tag="7")]
+    #[serde(deserialize_with = "f32_from_str")]
     pub l7_proto: f32,
     /// Layer 4 port
     #[prost(uint32, tag="8")]
@@ -48,4 +51,14 @@ pub struct FlowMessage {
     /// TCP flags
     #[prost(uint32, tag="12")]
     pub tcp_flags: u32,
+}
+
+pub fn f32_from_str<'de, D>(deserializer: D) -> Result<f32, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::Error;
+    String::deserialize(deserializer).and_then(|string| {
+        string.parse::<f32>().map_err(|_| Error::custom("failed to deserialize string to f32"))
+    })
 }
