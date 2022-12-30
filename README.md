@@ -6,7 +6,7 @@ This project presents a real-time intrusion detection system based on an artific
 Machine learning algorithms were used to build the system, which enabled the automatic detection of anomalies in network traffic. Thanks to this, the system is able to learn from historical data and detect new, previously unknown threats.
 
 ## Components
-### Local agent 
+### Local agent
 application which can be ran on a device like raspberry pi. it relies on external tool called `nprobe`, to be more specific, on the format that the tool exports collected packets in.
 
 * Collector is an agent responsible for receiving data in NetFlow version 9 format from nProbe exporter, which should be set to ZMQ. Captured data is sent with a host identifier to the server in a cloud via Kafka for further processing of the data.
@@ -15,10 +15,10 @@ application which can be ran on a device like raspberry pi. it relies on externa
 The project as a whole is designed to be deployed on Kubernetes. It kinds of follow microservice architecture, components are decoupled. Nonetheless, some of them use the same database or depends on the other ones. Although, it does not seem to be advanced enough to require different databases.
 
 #### Services
-* Processor - the processing service responsible for reading data stream from Kafka topics. Processed data is saved to database. 
+* Processor - the processing service responsible for reading data stream from Kafka topics. Processed data is saved to database.
 * Reporting - an API, which queries database to acquire aggregated, transformed data. Consists of HTTP and WebSocket endpoints, which allow to stream the data to clients.
-* Classifier - gRPC server that serves to classify NetFlow messages. The outcome can be `malicious` or `non-malicious`. 
-* Reporting-UI - Component responsible for serving user interface. 
+* Classifier - gRPC server that serves to classify NetFlow messages. The outcome can be `malicious` or `non-malicious`.
+* Reporting-UI - Component responsible for serving user interface.
 * Kafka - serves as a data streaming platform.
 * Clickhouse - stores collected and processed data.
 * Zookeeper - required for clickhouse and kafka.
@@ -42,7 +42,7 @@ Application for creating reports based on collected data, detailed information [
 ### classification
 Classification application, detailed information [here](./classification/)
 
-### frontend 
+### frontend
 User interface application, detailed information [here](./frontend/)
 
 ### charts
@@ -56,7 +56,13 @@ In order to minimize necessity for manual configuration of the servers and servi
 Detailed information [here](./deploy/)
 
 ## Deployment instructions
-### Provision infrastructure 
+### Prerequisites
+* being logged in to `az cli` - can be installed from [here](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli)
+* terraform - can be installed from [here](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli)
+* kubectl - can be installed from [here](https://kubernetes.io/docs/tasks/tools/)
+* helm - can be installed from [here](https://helm.sh/docs/intro/install/)
+
+### Provision infrastructure
 1. `cd deploy`
 2. Initialize terraform modules
 
@@ -71,9 +77,14 @@ terraform apply
 ```
 It requires manual input of `yes` after checking resources that are planned to be creates.
 4. Ensure that the previous command exited successfully
-5. Export public IP address of the Azure Load Balancer 
+5. Export public IP address of the Azure Load Balancer
 ```bash
-export PUBLIC_IP=$(terraform -chdir=../deploy output publicip)
+export PUBLIC_IP=$(terraform output -raw publicip)
+```
+6. Add kubeconfig
+```bash
+terraform output -raw kubeconfig >> ${HOME}/.kube/config
+export KUBECONFIG=$KUBECONFIG:
 ```
 
 ### Deploy helm chart to kubernetes
@@ -83,14 +94,10 @@ export PUBLIC_IP=$(terraform -chdir=../deploy output publicip)
 ```bash
 helm dependency update
 ```
-3. Create desired namespace (skip if already the one already exists)
+
+3. Install helm chart
 ```bash
-kubectl create ns <name>
+helm install <release-name> . -f values.yaml --namespace krewetka --create-namespace --set ingress-nginx.controller.service.loadBalancerIP=$PUBLIC_IP --set kafka.externalAccess.service.loadBalancerIPs={$PUBLIC_IP}
 ```
 
-4. Install helm chart
-```bash
-helm install <release-name> . -f values.yaml --namespace <namespace-from-step-2> --set ingress-nginx.controller.service.loadBalancerIP=$PUBLIC_IP --set kafka.externalAccess.service.loadBalancerIPs={$PUBLIC_IP}
-```
-
-5. Inspect k8s cluster, check whether all pods and services are running(in a green state)
+4. Inspect k8s cluster, check whether all pods and services are running(in a green state)

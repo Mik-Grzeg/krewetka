@@ -32,7 +32,14 @@ resource "azurerm_network_security_group" "nsg" {
 		protocol = "Tcp"
 		source_port_range = "*"
 		destination_port_ranges = ["80","443","9094"]
-		source_address_prefixes = []
+
+		# in case of a need to limit source addresses to specific ip ranges
+		# comment the line below
+		source_address_prefix = "*"
+
+		# also uncomment the line below and insert the ip range
+		# source_address_prefixes = ["<your ip address>"]
+
 		destination_address_prefix = "*"
 	}
 }

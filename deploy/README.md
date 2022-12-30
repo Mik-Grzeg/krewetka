@@ -14,6 +14,9 @@ whereas
 * \<region\> - azure region, in a adequate code e.g. `norwayeast`
 * \<subscription-id\> - azure subscription ID
 
+## Prerequisites
+Log into `az cli`
+
 ## Instructions
 1. Initialize terraform modules
 ```bash
