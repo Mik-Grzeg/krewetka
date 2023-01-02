@@ -100,20 +100,10 @@ impl ApplicationState {
         // spawning task responsbile for importing data
         let importer_task = task::spawn(async move { importers::run(importer, tx1).await });
 
-        // watch buffer state
-        let watcher_task = task::spawn(async move {
-            while !tx.is_closed() {
-                sleep(Duration::from_secs(5)).await;
-                info!("current capacity of buffer: {}", tx.capacity());
-            }
-        });
-
         // export data
         exporters::run(exporter, &mut rx, &identifier).await;
 
         importer_task.await;
-        watcher_task.await;
-        // exporter.await;
         Ok(())
     }
 }

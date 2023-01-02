@@ -32,14 +32,14 @@ def producer():
             PROTOCOL =  random.randint(0, 20),
             IN_BYTES = random.randint(50, 500),
             IN_PKTS = random.randint(0, 10),
-            L7_PROTO = random.random(),
+            L7_PROTO = f"{random.random()}",
             TCP_FLAGS = random.randint(0, 20),
             FLOW_DURATION_MILLISECONDS = random.randint(0, 100000),
         )
 
-        work_message = [b"flows", bytes(json.dumps(msg), encoding='utf-8')]
+        work_message = [b"flows", bytes(json.dumps([msg]), encoding='utf-8')]
         zmq_socket.send_multipart(work_message)
-        
+
         if counter % RPS == 0:
             time.sleep(1)
         counter += 1

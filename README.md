@@ -4,7 +4,6 @@
 This project presents a real-time intrusion detection system based on an artificial intelligence model. The purpose of this system is to detect disturbing or suspicious activities in the computer network and prevent unauthorized access to it.
 
 Machine learning algorithms were used to build the system, which enabled the automatic detection of anomalies in network traffic. Thanks to this, the system is able to learn from historical data and detect new, previously unknown threats.
-
 ## Components
 ### Local agent
 application which can be ran on a device like raspberry pi. it relies on external tool called `nprobe`, to be more specific, on the format that the tool exports collected packets in.

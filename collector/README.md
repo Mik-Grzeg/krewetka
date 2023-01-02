@@ -42,7 +42,7 @@ importer:
     zmqQueueName: flow
 exporter:
   destination: kafka
-  settings: 
+  settings:
     kafkaBrokers: "krewetka.norwayeast.cloudapp.azure.com:9094"
     kafkaTopic: flows
 ```

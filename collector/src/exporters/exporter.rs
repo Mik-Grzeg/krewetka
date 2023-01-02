@@ -24,7 +24,7 @@ pub async fn run(exporter: impl Export, rx: &mut Receiver<Vec<u8>>, identifier: 
         loop {
             interval.tick().await;
             let mut current = current_clone.lock().unwrap();
-            info!("RPS: {}", *current / 10);
+            info!("Exporting events with a speed of: {} events per second", *current / 10);
             *current = 0;
         }
     });
