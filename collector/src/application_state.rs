@@ -1,9 +1,8 @@
-use log::{error, info};
+use log::error;
 use std::fmt;
 
 use tokio::sync::mpsc;
 use tokio::task::{self};
-use tokio::time::{sleep, Duration};
 
 use crate::config::{ConfigCache, ConfigErr};
 use crate::exporters;
