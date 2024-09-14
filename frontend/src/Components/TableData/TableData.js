@@ -15,10 +15,10 @@ const TableData = () => {
     var start_time = new Date();
     start_time.setMinutes(start_time.getMinutes() - 15);
 
-    var host = "pingu-5.16.9-gentoo-x86_64";
+    var host = "pingu-6.1.67-gentoo-x86_64";
 
     const ws = new WebSocket(
-      `ws://krewetka.norwayeast.cloudapp.azure.com/analytics/api/v1/flows_details?host=${encodeURIComponent(
+      `ws://rest.norwayeast.cloudapp.azure.com/analytics/api/v1/flows_details?host=${encodeURIComponent(
         host
       )}&start_period=${encodeURIComponent(start_time.toISOString())}`
     );

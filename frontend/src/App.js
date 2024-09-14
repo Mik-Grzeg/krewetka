@@ -26,7 +26,7 @@ function App() {
 		start_time.setMinutes(start_time.getMinutes() - 15);
 		var aggr_interval = 60;
 
-		const ws = new WebSocket(`ws://krewetka.norwayeast.cloudapp.azure.com/analytics/api/v1/throughput?start_period=${encodeURIComponent(start_time.toISOString())}&aggr_interval=${aggr_interval}`);
+		const ws = new WebSocket(`ws://rest.norwayeast.cloudapp.azure.com/analytics/api/v1/throughput?start_period=${encodeURIComponent(start_time.toISOString())}&aggr_interval=${aggr_interval}`);
 		ws.onopen = (event) => {
 			console.log(JSON.stringify(event))
 			console.log("[open] Connection established")
